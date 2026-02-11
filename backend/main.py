@@ -8,7 +8,6 @@ from dataclasses import asdict
 from backend.agents.resource_allocation_agent import allocate_resources
 from backend.data.synthetic_generator import generate_events, summarize
 from backend.optimization.congestion_scenarios import get_scenario
-from backend.optimization import constraints
 
 
 def run(scenario_name: str, n: int = 200, seed: int = 42) -> None:
@@ -16,17 +15,14 @@ def run(scenario_name: str, n: int = 200, seed: int = 42) -> None:
     events = generate_events(n=n, scenario=scenario, seed=seed)
     summary = summarize(events)
 
-    recs, alerts = allocate_resources([asdict(ev) for ev in events], scenario)
-
-    total_patient_minutes = sum(ev.los_minutes for ev in events)
-    util_ratio, avg_occupied = constraints.rough_bed_utilization(
-        total_patient_minutes, scenario.ed_beds + scenario.icu_beds, horizon_hours=24
-    )
+    recs, alerts, metrics = allocate_resources([asdict(ev) for ev in events], scenario)
 
     print(f"Scenario: {scenario.name} — generated {summary['count']} patients")
     print(f"Average waiting time: {summary['avg_wait']} minutes")
     print(f"Average LOS: {summary['avg_los']} minutes")
-    print(f"Rough bed utilization: {round(util_ratio*100,1)}% (~{avg_occupied:.1f} beds occupied)")
+    print(f"ED utilization: {metrics['ed_util']*100:.1f}%")
+    print(f"ICU utilization: {metrics['icu_util']*100:.1f}%")
+    print(f"Overflow (waiting): {metrics['overflow']}")
     if alerts:
         print("Alerts:", ", ".join(alerts))
     # show a couple of recommendations

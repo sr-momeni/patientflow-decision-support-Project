@@ -21,6 +21,14 @@ class ScenarioConfig:
     ed_near_full_threshold: float = 0.9
     peak_hour_multiplier: float = 1.2  # simple way to bump volumes during peaks
 
+    @property
+    def ed_beds_available(self) -> int:  # convenience alias for clarity
+        return self.ed_beds
+
+    @property
+    def icu_beds_available(self) -> int:  # convenience alias for clarity
+        return self.icu_beds
+
 
 def _build_scenarios() -> Dict[str, ScenarioConfig]:
     """Create the three requested scenarios with documented assumptions."""
