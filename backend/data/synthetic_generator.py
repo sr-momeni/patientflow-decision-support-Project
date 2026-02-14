@@ -1,280 +1,234 @@
-"""Synthetic ED patient-flow event generator (MVP)."""
-
-from __future__ import annotations
+"""Synthetic CTAS-ready generator with benchmark injections."""
 
 import argparse
 import csv
-import heapq
 import random
-from collections import defaultdict, Counter
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, List, Sequence
 
+from backend.agents.urgency_scoring_agent import BENCHMARKS, TriageResult, triage_to_ctas
 from backend.optimization.congestion_scenarios import ScenarioConfig, get_scenario
-from backend.optimization import constraints
 
-
-RAW_DIR = Path(__file__).resolve().parent / "raw"
-
-
-# Required output columns for tests/contract
-REQUIRED_COLUMNS = [
+OUTPUT_COLUMNS = [
     "patient_id",
-    "arrival_ts",
-    "urgency_level",
+    "arrival_time_min",
     "arrival_mode",
-    "triage_ts",
-    "assessment_start_ts",
-    "lab_required",
-    "imaging_required",
-    "bed_assigned_type",
-    "admit_decision",
-    "discharge_ts",
-    "waiting_time_minutes",
-    "los_minutes",
+    "age",
+    "complaint_category",
+    "pain_score_0_10",
+    "hr",
+    "systolic_bp",
+    "rr",
+    "spo2",
+    "temp_c",
+    "loc",
+    "risk_chronic",
+    "risk_immunocompromised",
+    "risk_pregnancy",
+    "red_flag",
+    "ctas_level",
+    "expected_target_min",
 ]
 
 
 @dataclass
-class PatientEvent:
+class PatientRecord:
     patient_id: str
-    arrival_ts: str
-    urgency_level: int
+    arrival_time_min: float
     arrival_mode: str
-    triage_ts: str
-    assessment_start_ts: str
-    lab_required: bool
-    imaging_required: bool
-    bed_assigned_type: str
-    admit_decision: str
-    discharge_ts: str
-    waiting_time_minutes: float
-    los_minutes: float
-    icu_wait_flag: bool = False  # internal flag, not part of required columns
+    age: int
+    complaint_category: str
+    pain_score_0_10: int
+    hr: int
+    systolic_bp: int
+    rr: int
+    spo2: int
+    temp_c: float
+    loc: str
+    risk_chronic: bool
+    risk_immunocompromised: bool
+    risk_pregnancy: bool
+    red_flag: bool
+    ctas_level: int
+    expected_target_min: int
 
 
-def _choose_urgency_levels(n: int, scenario: ScenarioConfig) -> List[int]:
-    rates = scenario.arrival_rates_per_hour
-    total = sum(rates.values())
-    weights = [rates[level] / total for level in (1, 2, 3)]
-    return random.choices(population=[1, 2, 3], weights=weights, k=n)
+TARGET_MIN = {1: 0, 2: 15, 3: 30}
 
 
-def _arrival_minutes(n: int) -> List[float]:
-    # Uniformly spread over 24 hours, then sorted to preserve temporal order
-    return sorted(random.uniform(0, 24 * 60) for _ in range(n))
-
-
-def _probabilities_by_level(level: int) -> Dict[str, float]:
-    arrival_mode = {
-        1: (0.7, 0.05, 0.25),  # ambulance, walk-in, transfer
-        2: (0.3, 0.65, 0.05),
-        3: (0.05, 0.9, 0.05),
-    }
-    lab = {1: 0.8, 2: 0.6, 3: 0.3}
-    imaging = {1: 0.6, 2: 0.4, 3: 0.15}
-    icu_need = {1: 0.7, 2: 0.15, 3: 0.0}
+def _sample_vitals() -> Dict:
     return {
-        "arrival_mode_ambulance": arrival_mode[level][0],
-        "arrival_mode_walkin": arrival_mode[level][1],
-        "arrival_mode_transfer": arrival_mode[level][2],
-        "lab": lab[level],
-        "imaging": imaging[level],
-        "icu_need": icu_need[level],
+        "age": random.randint(18, 90),
+        "complaint_category": random.choice(["chest_pain", "sob", "abdominal_pain", "fever", "ankle_pain"]),
+        "pain_score_0_10": random.randint(0, 10),
+        "hr": random.randint(55, 140),
+        "systolic_bp": random.randint(90, 160),
+        "rr": random.randint(12, 30),
+        "spo2": random.randint(88, 100),
+        "temp_c": round(random.uniform(35.5, 39.5), 1),
+        "loc": random.choice(["alert", "verbal", "unresponsive"]),
+        "risk_chronic": random.random() < 0.25,
+        "risk_immunocompromised": random.random() < 0.1,
+        "risk_pregnancy": random.random() < 0.05,
     }
 
 
-def _base_service_minutes(level: int) -> float:
+def _arrival_mode_for_level(level: int) -> str:
     if level == 1:
-        return random.uniform(240, 420)
+        return random.choices(["ambulance", "transfer", "walk-in"], weights=[0.8, 0.15, 0.05])[0]
     if level == 2:
-        return random.uniform(120, 240)
-    return random.uniform(60, 120)
+        return random.choices(["ambulance", "walk-in"], weights=[0.3, 0.7])[0]
+    return "walk-in"
 
 
-def generate_events(
-    n: int,
-    scenario: ScenarioConfig,
-    seed: int = 42,
-    start_date: date | None = None,
-) -> List[PatientEvent]:
-    """Generate a reproducible list of PatientEvent records."""
+def generate_patients(n: int, scenario: ScenarioConfig, seed: int, inject_cases: bool = True) -> List[PatientRecord]:
+    """Generate reproducible patient rows aligned to CTAS 1/2/3."""
 
     random.seed(seed)
-    base_date = start_date or date.today()
+    records: List[PatientRecord] = []
+    pid = 1
 
-    urgency_levels = _choose_urgency_levels(n, scenario)
-    arrivals = _arrival_minutes(n)
-
-    ed_heap: List[float] = []  # stores release times (minutes since midnight)
-    icu_heap: List[float] = []
-    lab_requests_by_hour: Dict[int, int] = defaultdict(int)
-    imaging_requests_by_hour: Dict[int, int] = defaultdict(int)
-
-    events: List[PatientEvent] = []
-
-    for idx, (arrival_minute, urgency_level) in enumerate(zip(arrivals, urgency_levels), start=1):
-        probs = _probabilities_by_level(urgency_level)
-        mode_roll = random.random()
-        if mode_roll < probs["arrival_mode_ambulance"]:
-            arrival_mode = "ambulance"
-        elif mode_roll < probs["arrival_mode_ambulance"] + probs["arrival_mode_walkin"]:
-            arrival_mode = "walk-in"
+    def add_record(
+        vitals: Dict,
+        pid_value: int,
+        fixed_ctas: int | None = None,
+        arrival_time_min: float | None = None,
+        arrival_mode: str | None = None,
+    ) -> None:
+        if fixed_ctas is not None:
+            ctas_level = fixed_ctas
+            red_flag = fixed_ctas == 1
+            expected_target_min = TARGET_MIN[fixed_ctas]
         else:
-            arrival_mode = "transfer"
+            triage: TriageResult = triage_to_ctas(vitals)
+            ctas_level = triage.ctas_level
+            red_flag = triage.red_flag
+            expected_target_min = triage.expected_target_min
 
-        arrival_dt = datetime.combine(base_date, time()) + timedelta(minutes=arrival_minute)
-        triage_dt = arrival_dt + timedelta(minutes=random.uniform(3, 10))
+        arrival_mode_val = arrival_mode or _arrival_mode_for_level(ctas_level)
+        arrival_time_val = arrival_time_min if arrival_time_min is not None else random.uniform(0, 24 * 60)
 
-        hour_bucket = int(arrival_minute // 60)
-
-        lab_required = random.random() < probs["lab"]
-        imaging_required = random.random() < probs["imaging"]
-        if lab_required:
-            lab_requests_by_hour[hour_bucket] += 1
-        if imaging_required:
-            imaging_requests_by_hour[hour_bucket] += 1
-
-        lab_delay = constraints.estimate_queue_delay_minutes(
-            lab_requests_by_hour[hour_bucket], scenario.lab_slots_per_hour
-        ) if lab_required else 0.0
-        imaging_delay = constraints.estimate_queue_delay_minutes(
-            imaging_requests_by_hour[hour_bucket], scenario.imaging_slots_per_hour
-        ) if imaging_required else 0.0
-
-        icu_needed = random.random() < probs["icu_need"]
-        service_minutes = _base_service_minutes(urgency_level) + lab_delay + imaging_delay
-
-        wait_minutes = 0.0
-        bed_type = "ED"
-        icu_wait_flag = False
-
-        # ICU first if required and available
-        if icu_needed and scenario.icu_beds > 0:
-            while icu_heap and icu_heap[0] <= arrival_minute:
-                heapq.heappop(icu_heap)
-            if len(icu_heap) >= scenario.icu_beds:
-                wait_minutes = icu_heap[0] - arrival_minute
-            start_minute = arrival_minute + wait_minutes
-            heapq.heappush(icu_heap, start_minute + service_minutes)
-            bed_type = "ICU"
-        else:
-            # Either not ICU or no ICU capacity -> ED path
-            while ed_heap and ed_heap[0] <= arrival_minute:
-                heapq.heappop(ed_heap)
-            if len(ed_heap) >= scenario.ed_beds:
-                wait_minutes = ed_heap[0] - arrival_minute
-                if icu_needed and scenario.icu_beds == 0:
-                    icu_wait_flag = True
-            start_minute = arrival_minute + wait_minutes
-            bed_type = "ED"
-
-        # Extra congestion penalty if ED near full and Level 3
-        release_time = start_minute + service_minutes
-        ed_util_pre = constraints.utilization(len(ed_heap), scenario.ed_beds)
-        if bed_type == "ED" and urgency_level == 3 and ed_util_pre >= scenario.ed_near_full_threshold:
-            wait_minutes += 20.0
-            start_minute += 20.0
-            release_time += 20.0
-
-        if bed_type == "ICU":
-            heapq.heappush(icu_heap, release_time)
-        else:
-            heapq.heappush(ed_heap, release_time)
-
-        assessment_start_dt = datetime.combine(base_date, time()) + timedelta(minutes=start_minute)
-        discharge_dt = datetime.combine(base_date, time()) + timedelta(minutes=start_minute + service_minutes)
-
-        los_minutes = (discharge_dt - arrival_dt).total_seconds() / 60.0
-
-        admit_decision = _choose_disposition(urgency_level, bed_type)
-
-        events.append(
-            PatientEvent(
-                patient_id=f"P{idx:05d}",
-                arrival_ts=arrival_dt.isoformat(),
-                urgency_level=urgency_level,
-                arrival_mode=arrival_mode,
-                triage_ts=triage_dt.isoformat(),
-                assessment_start_ts=assessment_start_dt.isoformat(),
-                lab_required=lab_required,
-                imaging_required=imaging_required,
-                bed_assigned_type=bed_type,
-                admit_decision=admit_decision,
-                discharge_ts=discharge_dt.isoformat(),
-                waiting_time_minutes=round(wait_minutes, 2),
-                los_minutes=round(los_minutes, 2),
-                icu_wait_flag=icu_wait_flag,
+        records.append(
+            PatientRecord(
+                patient_id=f"P{pid_value:05d}",
+                arrival_time_min=arrival_time_val,
+                arrival_mode=arrival_mode_val,
+                red_flag=red_flag,
+                ctas_level=ctas_level,
+                expected_target_min=expected_target_min,
+                **{k: vitals[k] for k in (
+                    "age",
+                    "complaint_category",
+                    "pain_score_0_10",
+                    "hr",
+                    "systolic_bp",
+                    "rr",
+                    "spo2",
+                    "temp_c",
+                    "loc",
+                    "risk_chronic",
+                    "risk_immunocompromised",
+                    "risk_pregnancy",
+                )},
             )
         )
 
-    return events
+    if inject_cases:
+        fixed_cases = [
+            (
+                1,
+                {
+                    "age": 64,
+                    "complaint_category": "sob",
+                    "pain_score_0_10": 2,
+                    "hr": 128,
+                    "systolic_bp": 82,
+                    "rr": 30,
+                    "spo2": 85,
+                    "temp_c": 36.9,
+                    "loc": "unresponsive",
+                    "risk_chronic": True,
+                    "risk_immunocompromised": False,
+                    "risk_pregnancy": False,
+                },
+            ),
+            (
+                2,
+                {
+                    "age": 55,
+                    "complaint_category": "chest_pain",
+                    "pain_score_0_10": 7,
+                    "hr": 110,
+                    "systolic_bp": 120,
+                    "rr": 20,
+                    "spo2": 97,
+                    "temp_c": 37.0,
+                    "loc": "alert",
+                    "risk_chronic": False,
+                    "risk_immunocompromised": False,
+                    "risk_pregnancy": False,
+                },
+            ),
+            (
+                3,
+                {
+                    "age": 32,
+                    "complaint_category": "ankle_pain",
+                    "pain_score_0_10": 3,
+                    "hr": 82,
+                    "systolic_bp": 124,
+                    "rr": 16,
+                    "spo2": 98,
+                    "temp_c": 36.8,
+                    "loc": "alert",
+                    "risk_chronic": False,
+                    "risk_immunocompromised": False,
+                    "risk_pregnancy": False,
+                },
+            ),
+        ]
+        for idx, vitals in fixed_cases:
+            if pid > n:
+                break
+            add_record(
+                vitals,
+                pid,
+                fixed_ctas=idx,
+                arrival_time_min=pid * 5.0,
+                arrival_mode="ambulance" if idx == 1 else "walk-in",
+            )
+            pid += 1
+
+    for _ in range(pid, n + 1):
+        vitals = _sample_vitals()
+        add_record(vitals, pid)
+        pid += 1
+
+    return records
 
 
-def _choose_disposition(level: int, bed_type: str) -> str:
-    roll = random.random()
-    if level == 1:
-        return "admit" if roll < 0.8 else "transfer"
-    if level == 2:
-        if bed_type == "ICU":
-            return "admit" if roll < 0.7 else "transfer"
-        return "discharge" if roll < 0.5 else "admit"
-    # level 3
-    return "discharge" if roll < 0.85 else "admit"
-
-
-def save_events_to_csv(events: Sequence[PatientEvent], output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=REQUIRED_COLUMNS)
+def save_csv(records: Sequence[PatientRecord], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=OUTPUT_COLUMNS)
         writer.writeheader()
-        for ev in events:
-            row = asdict(ev)
-            row.pop("icu_wait_flag", None)  # not required in CSV
-            writer.writerow(row)
-
-
-def summarize(events: Sequence[PatientEvent]) -> Dict[str, float]:
-    waiting = [ev.waiting_time_minutes for ev in events]
-    los = [ev.los_minutes for ev in events]
-    by_urgency = defaultdict(list)
-    for ev in events:
-        by_urgency[ev.urgency_level].append(ev.waiting_time_minutes)
-
-    summary = {
-        "count": len(events),
-        "avg_wait": round(sum(waiting) / len(waiting), 2) if events else 0.0,
-        "avg_los": round(sum(los) / len(los), 2) if events else 0.0,
-    }
-    for level, waits in by_urgency.items():
-        summary[f"avg_wait_level_{level}"] = round(sum(waits) / len(waits), 2)
-    return summary
+        for rec in records:
+            writer.writerow(asdict(rec))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Synthetic ED patient-flow generator.")
-    parser.add_argument("--scenario", default="normal", help="Scenario name (normal|ed_congestion|icu_bottleneck)")
-    parser.add_argument("--n", type=int, default=500, help="Number of patients to generate")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
-    parser.add_argument("--output", type=str, default=None, help="Optional output CSV path")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scenario", default="normal")
+    parser.add_argument("--n", type=int, default=500)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--out", type=Path, default=Path("backend/data/raw/normal.csv"))
     args = parser.parse_args()
 
     scenario = get_scenario(args.scenario)
-    events = generate_events(args.n, scenario, seed=args.seed)
-
-    output_path = Path(args.output) if args.output else RAW_DIR / f"synthetic_{scenario.name}.csv"
-    save_events_to_csv(events, output_path)
-
-    summary = summarize(events)
-    print(f"Generated {summary['count']} records for scenario '{scenario.name}' -> {output_path}")
-    print(f"Average waiting time: {summary['avg_wait']} minutes")
-    print(f"Average LOS: {summary['avg_los']} minutes")
-    for level in (1, 2, 3):
-        key = f"avg_wait_level_{level}"
-        if key in summary:
-            print(f"Level {level} avg wait: {summary[key]} minutes")
+    records = generate_patients(args.n, scenario, seed=args.seed, inject_cases=True)
+    save_csv(records, args.out)
+    print(f"Wrote {len(records)} rows to {args.out}")
 
 
 if __name__ == "__main__":
