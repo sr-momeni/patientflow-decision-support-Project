@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Flow Decision Support</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Patient Flow Decision Support</h1>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <label>Total Patients</label>
+                    <span id="total-patients">0</span>
+                </div>
+                <div class="stat-item">
+                    <label>Avg Wait</label>
+                    <span id="avg-wait">0m</span>
+                </div>
+                <div class="stat-item">
+                    <label>Avg LOS</label>
+                    <span id="avg-los">0m</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="controls">
+            <select id="data-source-select"
+                style="margin-right: 15px; padding: 5px; background: #334155; color: white; border: 1px solid #475569; border-radius: 4px;">
+                <option value="original">Original Data</option>
+                <option value="predictive">Predictive AI Allocation</option>
+            </select>
+            <button id="zoom-in">+</button>
+            <button id="zoom-out">-</button>
+            <span id="time-range-label" style="margin-right: 15px;">24 Hours</span>
+            <button id="open-triage-btn"
+                style="background: #2563eb; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">+
+                New Triage</button>
+            <a href="/" style="margin-left: 10px; text-decoration: none;">
+                <button style="background: #475569; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                    Go to Home
+                </button>
+            </a>
+        </div>
+
+        <!-- Triage Modal -->
+        <div id="triage-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Patient Triage Assessment (CTAS)</h2>
+                    <button id="close-triage-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="triage-progress">
+                        <div class="progress-bar" id="triage-progress-bar"></div>
+                    </div>
+                    <form id="triage-form">
+                        <!-- Step 1: Base Info & Vitals -->
+                        <div class="triage-step" data-step="1">
+                            <h3>1. Patient Information & Vitals</h3>
+                            <div class="grid-2">
+                                <div class="form-group">
+                                    <label>Age</label>
+                                    <input type="number" id="t-age" name="age" placeholder="e.g. 45" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Heart Rate (bpm)</label>
+                                    <input type="number" id="t-hr" name="heart_rate" placeholder="e.g. 80">
+                                </div>
+                                <div class="form-group">
+                                    <label>Systolic BP (mmHg)</label>
+                                    <input type="number" id="t-sbp" name="systolic_bp" placeholder="e.g. 120">
+                                </div>
+                                <div class="form-group">
+                                    <label>SpO2 (%)</label>
+                                    <input type="number" id="t-spo2" name="spo2" placeholder="e.g. 98">
+                                </div>
+                                <div class="form-group">
+                                    <label>Resp. Rate (bpm)</label>
+                                    <input type="number" id="t-rr" name="respiratory_rate" placeholder="e.g. 16">
+                                </div>
+                                <div class="form-group">
+                                    <label>Level of Consciousness</label>
+                                    <select name="consciousness">
+                                        <option value="alert">Alert</option>
+                                        <option value="verbal">Verbal</option>
+                                        <option value="pain">Pain</option>
+                                        <option value="unresponsive">Unresponsive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Primary Complaint -->
+                        <div class="triage-step hidden" data-step="2">
+                            <h3>2. Primary Complaint</h3>
+                            <div class="form-group">
+                                <label>What is your primary reason for coming today?</label>
+                                <select name="primary_complaint" id="t-complaint">
+                                    <option value="general">Other / General</option>
+                                    <option value="chest pain">Chest pain or pressure</option>
+                                    <option value="breathing difficulty">Breathing difficulty</option>
+                                    <option value="fever">Fever or chills</option>
+                                    <option value="abdominal pain">Abdominal pain</option>
+                                    <option value="trauma">Injury (Fall, Trauma, etc.)</option>
+                                    <option value="mental health">Mental health concern</option>
+                                    <option value="stroke">Stroke symptoms</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Severity of Pain (0-10)</label>
+                                <input type="range" name="pain_score" min="0" max="10" value="0" id="t-pain-range">
+                                <span id="pain-val">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Red Flags & Risk -->
+                        <div class="triage-step hidden" data-step="3">
+                            <h3>3. Red Flags & History</h3>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" name="active_seizure"> Active Seizure</label>
+                                <label><input type="checkbox" name="uncontrollable_hemorrhage"> Uncontrolled
+                                    Bleeding</label>
+                                <label><input type="checkbox" name="history" value="chronic_disease"> Chronic Disease
+                                    (Diabetes, CHF)</label>
+                                <label><input type="checkbox" name="history" value="stroke_history"> History of
+                                    Stroke</label>
+                                <label><input type="checkbox" name="history" value="pregnancy" id="t-pregnancy-check">
+                                    Pregnancy</label>
+                                <label><input type="checkbox" name="history" value="immunocompromised">
+                                    Immunocompromised</label>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Conditional (Child/Pregnancy/etc.) -->
+                        <div class="triage-step hidden" data-step="4" id="conditional-step">
+                            <h3>4. Specific Assessment</h3>
+                            <!-- Pediatric Section -->
+                            <div id="pediatric-section" class="hidden">
+                                <label>Is the child alert and responsive?</label>
+                                <select name="child_responsive">
+                                    <option value="yes">Yes</option>
+                                    <option value="drowsy">No - Drowsy</option>
+                                    <option value="unresponsive">Unresponsive</option>
+                                </select>
+                            </div>
+                            <!-- Pregnancy Section -->
+                            <div id="pregnancy-section" class="hidden">
+                                <label>Weeks Pregnant?</label>
+                                <input type="number" name="weeks_pregnant" placeholder="Weeks">
+                            </div>
+                            <p id="no-conditional" class="text-muted">No additional specific assessment required for
+                                this patient.</p>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="prev-step" class="btn-secondary hidden">Previous</button>
+                    <button id="next-step" class="btn-primary">Next</button>
+                    <button id="submit-triage" class="btn-success hidden">Complete Triage</button>
+                </div>
+            </div>
+        </div>
+
+        <main id="timeline-container">
+            <canvas id="timeline-canvas"></canvas>
+            <div id="tooltip" class="tooltip hidden"></div>
+        </main>
+
+        <div class="legend">
+            <div class="legend-item"><span class="dot u1"></span> Urgency 1 (Critical)</div>
+            <div class="legend-item"><span class="dot u2"></span> Urgency 2 (Urgent)</div>
+            <div class="legend-item"><span class="dot u3"></span> Urgency 3 (Standard)</div>
+            <div class="legend-item"><span class="bar-sample wait"></span> Waiting</div>
+            <div class="legend-item"><span class="bar-sample service"></span> In Treatment</div>
+        </div>
+    </div>
+    <script src="data_original.js"></script>
+    <script src="data_predictive.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
