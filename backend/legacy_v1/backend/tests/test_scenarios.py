@@ -1,6 +1,6 @@
 import pytest
 
-from backend.optimization.congestion_scenarios import get_scenario, list_scenarios
+from backend.optimization.congestion_scenarios import get_scenario, list_scenarios, validate_scenario
 
 
 def test_named_scenarios_exist():
@@ -11,6 +11,4 @@ def test_named_scenarios_exist():
 @pytest.mark.parametrize("name", ["normal", "ed_congestion", "icu_bottleneck"])
 def test_scenario_fields_positive(name):
     scenario = get_scenario(name)
-    assert scenario.ed_beds > 0
-    assert scenario.physicians > 0
-    assert scenario.lab_slots_per_hour > 0
+    validate_scenario(scenario)
