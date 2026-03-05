@@ -2,7 +2,7 @@
 
 An AI-powered hospital bed allocation system that uses machine learning to predict critical patient arrivals and proactively reserve beds to minimize wait times.
 
-## 🎯 Overview
+##  Overview
 
 This system implements a **Predictive Bed Allocation AI** that:
 - Predicts when critical patients (Urgency Level 1) will arrive
@@ -10,7 +10,7 @@ This system implements a **Predictive Bed Allocation AI** that:
 - Reduces wait times for life-threatening cases by 20-40% (target)
 - Balances resource efficiency with patient safety
 
-## 🧠 How the AI Works
+##  How the AI Works
 
 ### High-Level Flow
 
@@ -115,7 +115,7 @@ Reserved Bed Pool:    [R][R]                    (2 beds)
          → Patient #47 gets the bed
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 patientflow-decision-support-Project/
@@ -147,7 +147,7 @@ patientflow-decision-support-Project/
 └── convert_data.py                # CSV to frontend data converter
 ```
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### Prerequisites
 - Python 3.8+
@@ -192,7 +192,7 @@ Open `frontend/index.html` in a web browser to see:
 - Zoom/pan controls
 - Patient wait time statistics
 
-## 📊 Performance Comparison
+##  Performance Comparison
 
 | Urgency Level | Original (min) | Predictive AI (min) | Target Improvement |
 |---------------|----------------|---------------------|-------------------|
@@ -202,7 +202,7 @@ Open `frontend/index.html` in a web browser to see:
 
 *Current implementation has a reservation release bug. Fix in progress.
 
-## ⚠️ Known Issues
+##  Known Issues
 
 ### Reservation Logic Bug
 **Issue**: Beds aren't releasing properly after timeout or when critical patients use them.
@@ -214,7 +214,7 @@ Open `frontend/index.html` in a web browser to see:
 - Release beds when used OR timeout
 - Update effective capacity dynamically
 
-## 🎨 Features
+##  Features
 
 - **Interactive Timeline**: Zoom and pan through patient flow
 - **Color-coded Urgency**: Visual distinction between patient priorities
@@ -222,17 +222,19 @@ Open `frontend/index.html` in a web browser to see:
 - **Real-time Statistics**: Live calculation of wait times and occupancy
 - **Comparison Mode**: Toggle between allocation strategies
 
-## 📝 License
+##  License
 
 MIT License
 
-## 👨‍💻 Author
-
+##  Authors
+Salar Momeni
 Sal Khokhar
+Dima Alqaruoti
+Akanksha R.Swamy
 
 ---
 
-## 🔧 Technical Details
+##  Technical Details
 
 ### Dependencies
 - `scikit-learn`: Machine learning model
@@ -264,7 +266,7 @@ Sal Khokhar
 }
 ```
 
-## 🔮 Future Enhancements
+##  Future Enhancements
 
 1. **Fix Reservation Bug**: Implement proper bed release mechanism
 2. **Multi-factor Optimization**: Optimize for wait time + utilization + fairness
