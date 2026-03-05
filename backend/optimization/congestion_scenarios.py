@@ -1,3 +1,4 @@
+"""Definitions of configurable ED congestion scenarios for the MVP."""
 """Definitions of operational scenarios for CTAS 1/2/3/4/5 MVP."""
 
 from dataclasses import dataclass
@@ -6,6 +7,7 @@ from typing import Dict
 
 @dataclass
 class ScenarioConfig:
+    """Lightweight container describing capacity and arrival assumptions."""
     """Capacity + arrival assumptions for CTAS 1–5."""
 
     name: str
@@ -16,6 +18,10 @@ class ScenarioConfig:
     nurses: int
     lab_slots_per_hour: int
     imaging_slots_per_hour: int
+    arrival_rates_per_hour: Dict[int, float]  # urgency level -> expected hourly arrivals
+    senior_staff_available: bool = True
+    ed_near_full_threshold: float = 0.9
+    peak_hour_multiplier: float = 1.2  # simple way to bump volumes during peaks
 
     # CTAS level -> hourly arrivals (now supports 1..5)
     arrival_rates_per_hour: Dict[int, float]
@@ -48,13 +54,16 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
 
     normal = ScenarioConfig(
         name="normal",
-        description="Balanced arrivals with comfortable ED/ICU capacity.",
-        ed_beds=40,
-        icu_beds=10,
+        description="Balanced arrivals with comfortable ED and ICU capacity.",
+        ed_beds=50,
+        icu_beds=20,
         physicians=8,
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
+        arrival_rates_per_hour={1: 2.0, 2: 8.0, 3: 12.0},
+        senior_staff_available=True,
+        ed_near_full_threshold=0.85,
         arrival_rates_per_hour={
             1: 2.0,
             2: 8.0,
@@ -68,6 +77,7 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
 
     ed_congestion = ScenarioConfig(
         name="ed_congestion",
+        description="ED beds nearly saturated with heavier Level 2/3 walk-ins.",
         description="ED beds nearly saturated with heavier CTAS2/3/4 walk-ins.",
         ed_beds=26,
         icu_beds=8,
@@ -75,6 +85,9 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         nurses=18,
         lab_slots_per_hour=18,
         imaging_slots_per_hour=12,
+        arrival_rates_per_hour={1: 2.2, 2: 12.0, 3: 20.0},
+        senior_staff_available=True,
+        ed_near_full_threshold=0.9,
         arrival_rates_per_hour={
             1: 2.2,
             2: 12.0,
@@ -88,13 +101,16 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
 
     icu_bottleneck = ScenarioConfig(
         name="icu_bottleneck",
-        description="ICU almost full; CTAS1 may stay in ED while waiting.",
+        description="ICU essentially full; Level 1 stays in ED while waiting.",
         ed_beds=36,
         icu_beds=2,
         physicians=8,
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
+        arrival_rates_per_hour={1: 3.0, 2: 9.0, 3: 12.0},
+        senior_staff_available=True,
+        ed_near_full_threshold=0.9,
         arrival_rates_per_hour={
             1: 3.0,
             2: 9.0,

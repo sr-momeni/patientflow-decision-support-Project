@@ -1,77 +1,154 @@
-"""CTAS 1/2/3 scorer with red-flag overrides."""
+"""Urgency Scoring Agent based on CTAS guidelines."""
 
-from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Any, List
 
+class UrgencyScoringAgent:
+    """Classifies patient urgency into CTAS levels 1-5."""
+    
+    def __init__(self):
+        # Thresholds for CTAS Mapping
+        self.MAPPING = [
+            (9, 1),  # >= 9 -> CTAS 1
+            (7, 2),  # 7-8  -> CTAS 2
+            (4, 3),  # 4-6  -> CTAS 3
+            (2, 4),  # 2-3  -> CTAS 4
+            (0, 5)   # 0-1  -> CTAS 5
+        ]
 
-@dataclass
-class TriageResult:
-    ctas_level: int
-    expected_target_min: int
-    red_flag: bool
+    def calculate_urgency(self, data: Dict[str, Any]) -> int:
+        """
+        Calculates CTAS level based on provided patient data.
+        
+        Data schema:
+        - gcs: int (3-15)
+        - spo2: float (0-100)
+        - active_seizure: bool
+        - uncontrollable_hemorrhage: bool
+        - heart_rate: int
+        - systolic_bp: int
+        - respiratory_rate: int
+        - temperature: float
+        - consciousness: str ('alert', 'verbal', 'pain', 'unresponsive')
+        - primary_complaint: str
+        - pain_score: int (0-10)
+        - age: int
+        - history: List[str] (e.g., ['chronic_disease', 'stroke', 'pregnancy'])
+        """
+        
+        # Step 1: Red-Flag Override (CTAS 1)
+        if self._is_ctas1_override(data):
+            return 1
+            
+        # Step 2: Weighted Clinical Scoring
+        vitals_score = self._score_vitals(data)
+        complaint_score = self._score_complaint(data)
+        risk_score = self._score_risks(data)
+        age_adj = self._age_adjustment(data)
+        
+        total_score = vitals_score + complaint_score + risk_score + age_adj
+        
+        # Step 3: Mapping
+        for threshold, level in self.MAPPING:
+            if total_score >= threshold:
+                return level
+        
+        return 5
 
+    def _is_ctas1_override(self, data: Dict[str, Any]) -> bool:
+        """Check for immediate life-threatening conditions."""
+        if data.get('consciousness') == 'unresponsive':
+            return True
+        if data.get('spo2', 100) < 90:
+            return True
+        if data.get('active_seizure'):
+            return True
+        if data.get('uncontrollable_hemorrhage'):
+            return True
+        if data.get('resp_distress') == 'severe':
+            return True
+        return False
 
-RED_FLAG_TARGET = {1: 0, 2: 15, 3: 30}
+    def _score_vitals(self, data: Dict[str, Any]) -> int:
+        """Scores vital instability."""
+        points = 0
+        
+        hr = data.get('heart_rate', 70)
+        sbp = data.get('systolic_bp', 120)
+        rr = data.get('respiratory_rate', 16)
+        spo2 = data.get('spo2', 98)
+        cons = data.get('consciousness', 'alert')
 
+        # Refined thresholds per user's scoring rules
+        # Severe (+5), Moderate (+3), Mild (+1)
+        
+        # Spo2 Hypoxia
+        if spo2 < 90: points += 5
+        elif spo2 < 92: points += 3
+        elif spo2 < 95: points += 1
+        
+        # Consciousness
+        if cons in ['unresponsive', 'pain']: points += 5
+        elif cons == 'verbal': points += 3
+        
+        # Systolic BP
+        if sbp < 80: points += 5
+        elif sbp < 90: points += 3
+        elif sbp < 100: points += 1
+        
+        # Respiratory Rate
+        if rr > 35: points += 5
+        elif rr > 30: points += 3
+        elif rr > 24: points += 1
+        
+        # Heart Rate
+        if hr > 130: points += 5
+        elif hr > 120: points += 3
+        elif hr > 100: points += 1
+            
+        return points
 
-def is_red_flag(vitals: Dict) -> bool:
-    return (
-        vitals.get("loc", "").lower() in {"unresponsive", "gcs<8"}
-        or vitals.get("spo2", 100) < 90
-        or vitals.get("systolic_bp", 200) < 90
-        or vitals.get("active_seizure", False)
-        or vitals.get("hemorrhage_uncontrolled", False)
-    )
+    def _score_complaint(self, data: Dict[str, Any]) -> int:
+        """Scores symptom severity and pain."""
+        complaint = data.get('primary_complaint', '').lower()
+        score = 0
+        
+        if 'chest pain' in complaint or 'stroke' in complaint:
+            score = 4
+        elif 'abdominal pain' in complaint:
+            score = 3
+        elif 'injury' in complaint or 'trauma' in complaint:
+            score = 2
+        else:
+            score = 1
+            
+        # Pain adjustment
+        pain = data.get('pain_score', 0)
+        if pain >= 8:
+            score += 2
+        elif pain >= 5:
+            score += 1
+            
+        return score
 
+    def _score_risks(self, data: Dict[str, Any]) -> int:
+        """Scores risk modifiers."""
+        score = 0
+        history = data.get('history', [])
+        
+        if 'chronic_disease' in history:
+            score += 1
+        if 'immunocompromised' in history:
+            score += 1
+        if 'pregnancy' in history:
+            score += 2
+        if 'stroke_history' in history:
+            score += 1
+            
+        return score
 
-def score_weighted(v: Dict) -> int:
-    score = 0
-    # vital instability
-    hr = v.get("hr", 80)
-    sbp = v.get("systolic_bp", 120)
-    rr = v.get("rr", 16)
-    temp = v.get("temp_c", 36.8)
-    score += 2 if hr < 50 or hr > 130 else 1 if hr > 110 else 0
-    score += 2 if sbp < 95 else 1 if sbp < 105 else 0
-    score += 2 if rr < 10 or rr > 30 else 1 if rr > 24 else 0
-    score += 1 if temp > 38.5 or temp < 35.0 else 0
-    # pain + complaint
-    pain = v.get("pain_score_0_10", 0)
-    score += 2 if pain >= 8 else 1 if pain >= 5 else 0
-    severe_complaints = {"chest_pain", "sob", "neuro_deficit"}
-    score += 2 if v.get("complaint_category") in severe_complaints else 0
-    # risk modifiers
-    if v.get("age", 40) > 65:
-        score += 1
-    if v.get("risk_chronic"):
-        score += 1
-    if v.get("risk_immunocompromised"):
-        score += 1
-    if v.get("risk_pregnancy"):
-        score += 1
-    return score
-
-
-def map_score_to_ctas(score: int) -> int:
-    if score >= 6:
-        return 1
-    if score >= 3:
-        return 2
-    return 3
-
-
-def triage_to_ctas(vitals: Dict) -> TriageResult:
-    red = is_red_flag(vitals)
-    if red:
-        level = 1
-    else:
-        level = map_score_to_ctas(score_weighted(vitals))
-    return TriageResult(ctas_level=level, expected_target_min=RED_FLAG_TARGET[level], red_flag=red)
-
-
-# Benchmark patients
-BENCHMARKS = {
-    "A": {"loc": "unresponsive", "spo2": 85, "systolic_bp": 80, "complaint_category": "sob"},
-    "B": {"hr": 120, "systolic_bp": 105, "rr": 24, "complaint_category": "chest_pain", "pain_score_0_10": 7},
-    "C": {"hr": 88, "systolic_bp": 125, "rr": 16, "complaint_category": "ankle_pain", "pain_score_0_10": 3},
-}
+    def _age_adjustment(self, data: Dict[str, Any]) -> int:
+        """Adjusts score for age vulnerabilities."""
+        age = data.get('age', 30)
+        if age > 65 or age < 18:
+            return 1
+        return 0

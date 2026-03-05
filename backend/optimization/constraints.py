@@ -1,11 +1,13 @@
-"""Capacity and queue helpers for CTAS MVP."""
+"""Simple capacity and queue utility helpers for the MVP."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Tuple
 
 
 @dataclass
-class ResourceConstraints:
+class CapacityState:
     ed_beds: int
     icu_beds: int
     physicians: int
@@ -14,29 +16,52 @@ class ResourceConstraints:
     imaging_slots_per_hour: int
 
 
-def utilization(occupied: int, capacity: int) -> float:
-    """
-    Return utilization as occupied/capacity capped at 1.0 for reporting.
-    Overflow should be tracked separately.
-    """
+def has_capacity(current: int, capacity: int) -> bool:
+    """Return True when capacity is available (current load below capacity)."""
+
+    return current < capacity
+
+
+def utilization(current: int, capacity: int) -> float:
+    """Compute utilization ratio, guarding divide-by-zero."""
 
     if capacity <= 0:
         return 1.0
-    return min(occupied / capacity, 1.0)
+    return min(current / capacity, 1.5)  # cap to avoid runaway
 
 
-def queue_delay_minutes(requests: int, slots_per_hour: int) -> float:
-    """Linear delay when demand exceeds hourly slots; zero otherwise."""
+def estimate_queue_delay_minutes(requests_this_hour: int, slots_per_hour: int) -> float:
+    """
+    Crude delay approximation: if demand exceeds hourly slots, add linear delay.
+
+    When requests <= slots, delay is zero. Otherwise each extra request adds
+    one slot's worth of time evenly spread through the hour.
+    """
 
     if slots_per_hour <= 0:
-        return 60.0
-    overload = max(requests - slots_per_hour, 0)
-    if overload <= 0:
+        return 60.0  # totally blocked
+    overload = max(requests_this_hour - slots_per_hour, 0)
+    if overload == 0:
         return 0.0
     return (overload / slots_per_hour) * 60.0
 
 
-def rough_los_minutes(base_minutes: float, wait: float, lab_delay: float, img_delay: float) -> float:
-    """Simple LOS proxy: base care time plus waits and ancillary delays."""
+def estimate_bed_wait_minutes(occupied_until_minutes: float, arrival_minute: float) -> float:
+    """Return minutes to wait for a bed; 0 when arrival is after release."""
 
-    return base_minutes + wait + lab_delay + img_delay
+    return max(occupied_until_minutes - arrival_minute, 0.0)
+
+
+def rough_bed_utilization(total_patient_minutes: float, capacity: int, horizon_hours: float) -> Tuple[float, float]:
+    """
+    Approximate bed utilization and average occupancy.
+
+    Returns (utilization_ratio, avg_occupied_beds).
+    """
+
+    if capacity <= 0 or horizon_hours <= 0:
+        return 1.0, float(capacity)
+    total_capacity_minutes = capacity * horizon_hours * 60.0
+    util = min(total_patient_minutes / total_capacity_minutes, 1.5)
+    avg_occupied = (util * capacity)
+    return util, avg_occupied

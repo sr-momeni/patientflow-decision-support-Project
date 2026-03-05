@@ -1,0 +1,89 @@
+.auth-wrapper {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f0f4f8;
+    margin: 0;
+}
+
+.auth-card {
+    display: flex;
+    /* Reduced width from 1000px to 850px */
+    width: 850px; 
+    /* Reduced height from 650px to 550px */
+    height: 550px; 
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.form-container {
+    flex: 1.1;
+    padding: 40px 50px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 25px; 
+}
+
+.brand-name {
+    font-size: 20px; 
+    font-weight: 700;
+    color: #1a56be;
+}
+
+.title {
+    font-size: 22px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.main-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px; 
+}
+
+.input-field {
+    width: 100%;
+    padding: 10px 14px; 
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background-color: #f8fbff;
+    font-size: 14px;
+}
+
+.submit-button {
+    width: 100%;
+    padding: 12px;
+    background-color: #1a56be;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+.image-container {
+    flex: 0.9;
+    background-color: #f8fbff;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 90px;
+}
+
+.side-image {
+    width: 100%; 
+    height: auto;
+}

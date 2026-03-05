@@ -1,0 +1,163 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background-color: #f5f7fa;
+}
+
+.container {
+  height: 100vh;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 40px;
+  background-color: white;
+}
+
+.ehospital img {
+  height: 65px;   
+  width: auto;
+}
+
+.logo {
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.nav-links a {
+  margin-right: 25px;
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+}
+
+.register-btn {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.hero {
+  text-align: center;
+  padding-top: 40px;
+}
+
+.top-img {
+  width: 30px;
+  height: 30px;
+  margin: 10px auto;
+}
+
+.hero {
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 42px;
+  font-weight: 700;
+  color: #333;
+}
+
+.hero span {
+  color: #2563eb;
+}
+
+.hero p {
+  margin-top: 15px;
+  color: #777;
+  font-size: 16px;
+}
+
+.login-btn {
+  margin-top: 25px;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 15px;
+}
+
+.nav-btn {
+  background-color: #1e4db7;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 25px;   
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.login-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f4f7fe;
+}
+
+.login-card {
+  display: flex;
+  background: white;
+  border-radius: 25px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  width: 900px;
+  height: 500px;
+}
+
+.login-form {
+  flex: 1;
+  padding: 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-input {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #f8f9ff;
+}
+
+.login-submit-btn {
+  background: #1a56be;
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  margin-top: 20px;
+  cursor: pointer;
+}
+
+.login-image {
+  flex: 1;
+  background-color: #f8f9ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-image img {
+  width: 80%;
+}
