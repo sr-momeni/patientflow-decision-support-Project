@@ -1,10 +1,46 @@
 """Predictive simulation engine with AI-based bed reservation."""
 
 import heapq
-from typing import List
+from typing import Dict, List
 from datetime import timedelta
 from backend.simulation.event_model import SimulationPatient, HospitalState
 from backend.ml.predictor import HighUrgencyPredictor
+
+
+def summarize_simulation_metrics(
+    patients: List[SimulationPatient],
+    ed_capacity: int,
+    icu_capacity: int,
+) -> Dict[str, float]:
+    """Compute basic performance metrics from completed simulation results."""
+
+    if not patients:
+        return {
+            "average_waiting_time": 0.0,
+            "average_los": 0.0,
+            "ed_bed_utilization": 0.0,
+            "icu_bed_utilization": 0.0,
+        }
+
+    avg_wait = sum(p.wait_minutes for p in patients) / len(patients)
+    avg_los = sum(p.los_minutes for p in patients) / len(patients)
+
+    start_time = min(p.arrival for p in patients)
+    end_time = max(p.discharge for p in patients if p.discharge is not None)
+    horizon_minutes = max((end_time - start_time).total_seconds() / 60.0, 1.0)
+
+    ed_patient_minutes = sum(p.los_minutes for p in patients if p.bed_type == "ED")
+    icu_patient_minutes = sum(p.los_minutes for p in patients if p.bed_type == "ICU")
+
+    ed_util = ed_patient_minutes / (ed_capacity * horizon_minutes) if ed_capacity > 0 else 0.0
+    icu_util = icu_patient_minutes / (icu_capacity * horizon_minutes) if icu_capacity > 0 else 0.0
+
+    return {
+        "average_waiting_time": round(avg_wait, 2),
+        "average_los": round(avg_los, 2),
+        "ed_bed_utilization": round(ed_util, 4),
+        "icu_bed_utilization": round(icu_util, 4),
+    }
 
 class PredictiveEngine:
     """Simulation engine with ML-based predictive bed reservation."""

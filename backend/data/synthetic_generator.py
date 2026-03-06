@@ -36,6 +36,9 @@ REQUIRED_COLUMNS = [
     "los_minutes",
 ]
 
+# Backward-compatible alias for older tests/imports.
+OUTPUT_COLUMNS = REQUIRED_COLUMNS
+
 
 @dataclass
 class PatientEvent:
@@ -53,6 +56,11 @@ class PatientEvent:
     waiting_time_minutes: float
     los_minutes: float
     icu_wait_flag: bool = False  # internal flag, not part of required columns
+
+    @property
+    def ctas_level(self) -> int:
+        """Backward-compatible alias for older tests."""
+        return self.urgency_level
 
 
 def _choose_urgency_levels(n: int, scenario: ScenarioConfig) -> List[int]:
@@ -295,6 +303,37 @@ def summarize(events: Sequence[PatientEvent]) -> Dict[str, float]:
     for level, waits in by_urgency.items():
         summary[f"avg_wait_level_{level}"] = round(sum(waits) / len(waits), 2)
     return summary
+
+
+def generate_patients(
+    n: int,
+    scenario: ScenarioConfig,
+    seed: int = 0,
+    inject_cases: bool = False,
+    **kwargs,
+) -> List[PatientEvent]:
+    """
+    Backward-compatible wrapper for older tests.
+
+    This maps the legacy generator name onto the current event generator
+    without changing the current simulation data model.
+    """
+
+    events = generate_events(
+        n=n,
+        scenario=scenario,
+        seed=seed,
+        start_date=kwargs.get("start_date"),
+    )
+
+    if inject_cases:
+        benchmark_levels = [1, 2, 3, 4, 5]
+        for idx, level in enumerate(benchmark_levels):
+            if idx >= len(events):
+                break
+            events[idx].urgency_level = level
+
+    return events
 
 
 def main() -> None:

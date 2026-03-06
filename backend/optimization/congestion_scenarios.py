@@ -1,5 +1,4 @@
-"""Definitions of configurable ED congestion scenarios for the MVP."""
-"""Definitions of operational scenarios for CTAS 1/2/3/4/5 MVP."""
+"""Definitions of operational scenarios for the CTAS 1-5 MVP."""
 
 from dataclasses import dataclass
 from typing import Dict
@@ -7,8 +6,7 @@ from typing import Dict
 
 @dataclass
 class ScenarioConfig:
-    """Lightweight container describing capacity and arrival assumptions."""
-    """Capacity + arrival assumptions for CTAS 1–5."""
+    """Capacity and arrival assumptions for ED simulation scenarios."""
 
     name: str
     description: str
@@ -18,15 +16,10 @@ class ScenarioConfig:
     nurses: int
     lab_slots_per_hour: int
     imaging_slots_per_hour: int
-    arrival_rates_per_hour: Dict[int, float]  # urgency level -> expected hourly arrivals
+    arrival_rates_per_hour: Dict[int, float]
     senior_staff_available: bool = True
     ed_near_full_threshold: float = 0.9
-    peak_hour_multiplier: float = 1.2  # simple way to bump volumes during peaks
-
-    # CTAS level -> hourly arrivals (now supports 1..5)
-    arrival_rates_per_hour: Dict[int, float]
-
-    # Utilization thresholds that can trigger alerts
+    peak_hour_multiplier: float = 1.2
     ed_util_alert: float = 0.9
     icu_util_alert: float = 0.9
 
@@ -39,18 +32,12 @@ class ScenarioConfig:
         return self.icu_beds
 
     def arrival_rate(self, ctas_level: int) -> float:
-        """Safe accessor (returns 0.0 if a level isn't specified)."""
+        """Safe accessor for per-level arrival rates."""
         return float(self.arrival_rates_per_hour.get(ctas_level, 0.0))
 
 
 def _build_scenarios() -> Dict[str, ScenarioConfig]:
-    """Create scenarios with CTAS 1–5 documented assumptions."""
-
-    # Notes on added CTAS 4/5 rates:
-    # - CTAS4: less urgent, often fewer labs/imaging than CTAS2/3
-    # - CTAS5: non-urgent, typically lowest acuity (still counts as ED load)
-    #
-    # You can tune these to match your site data.
+    """Create scenarios with CTAS 1-5 documented assumptions."""
 
     normal = ScenarioConfig(
         name="normal",
@@ -61,9 +48,6 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
-        arrival_rates_per_hour={1: 2.0, 2: 8.0, 3: 12.0},
-        senior_staff_available=True,
-        ed_near_full_threshold=0.85,
         arrival_rates_per_hour={
             1: 2.0,
             2: 8.0,
@@ -71,23 +55,21 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
             4: 10.0,
             5: 6.0,
         },
+        senior_staff_available=True,
+        ed_near_full_threshold=0.85,
         ed_util_alert=0.9,
         icu_util_alert=0.9,
     )
 
     ed_congestion = ScenarioConfig(
         name="ed_congestion",
-        description="ED beds nearly saturated with heavier Level 2/3 walk-ins.",
-        description="ED beds nearly saturated with heavier CTAS2/3/4 walk-ins.",
+        description="ED beds nearly saturated with heavier CTAS 2/3/4 walk-ins.",
         ed_beds=26,
         icu_beds=8,
         physicians=7,
         nurses=18,
         lab_slots_per_hour=18,
         imaging_slots_per_hour=12,
-        arrival_rates_per_hour={1: 2.2, 2: 12.0, 3: 20.0},
-        senior_staff_available=True,
-        ed_near_full_threshold=0.9,
         arrival_rates_per_hour={
             1: 2.2,
             2: 12.0,
@@ -95,22 +77,21 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
             4: 16.0,
             5: 10.0,
         },
+        senior_staff_available=True,
+        ed_near_full_threshold=0.9,
         ed_util_alert=0.9,
         icu_util_alert=0.9,
     )
 
     icu_bottleneck = ScenarioConfig(
         name="icu_bottleneck",
-        description="ICU essentially full; Level 1 stays in ED while waiting.",
+        description="ICU essentially full; high-acuity patients may remain in ED while waiting.",
         ed_beds=36,
         icu_beds=2,
         physicians=8,
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
-        arrival_rates_per_hour={1: 3.0, 2: 9.0, 3: 12.0},
-        senior_staff_available=True,
-        ed_near_full_threshold=0.9,
         arrival_rates_per_hour={
             1: 3.0,
             2: 9.0,
@@ -118,6 +99,8 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
             4: 9.0,
             5: 5.0,
         },
+        senior_staff_available=True,
+        ed_near_full_threshold=0.9,
         ed_util_alert=0.9,
         icu_util_alert=0.9,
     )
@@ -143,7 +126,7 @@ def list_scenarios() -> Dict[str, ScenarioConfig]:
 
 
 def validate_scenario(cfg: ScenarioConfig) -> None:
-    """Basic sanity checks to keep scenarios reasonable (CTAS 1–5)."""
+    """Basic sanity checks to keep scenarios reasonable."""
 
     if not (cfg.ed_beds > 0 and cfg.icu_beds >= 0):
         raise ValueError("ed_beds must be > 0 and icu_beds must be >= 0")
@@ -154,7 +137,6 @@ def validate_scenario(cfg: ScenarioConfig) -> None:
     if cfg.lab_slots_per_hour <= 0 or cfg.imaging_slots_per_hour <= 0:
         raise ValueError("lab_slots_per_hour and imaging_slots_per_hour must be > 0")
 
-    # Now validate CTAS levels 1..5
     for lvl in (1, 2, 3, 4, 5):
         rate = cfg.arrival_rates_per_hour.get(lvl, 0.0)
         if rate < 0:
