@@ -7,6 +7,12 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import os
+import sys
+
+# Add backend directory to path so chatbot package resolves correctly
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 # Import database module (moved from eHospital)
 # We need to make sure this import works. 
@@ -17,6 +23,13 @@ except ImportError:
     import database
 
 app = FastAPI()
+
+# --- Chatbot Router ---
+try:
+    from chatbot.chatbot_routes import router as chatbot_router
+    app.include_router(chatbot_router, prefix="/chatbot")
+except Exception as _e:
+    print(f"WARNING: Could not load chatbot module: {_e}")
 
 # CORS Middleware
 app.add_middleware(

@@ -7,6 +7,8 @@ const CONFIG = {
         1: '#ef4444', // Red
         2: '#f97316', // Orange
         3: '#10b981', // Green
+        4: '#22d3ee', // Cyan
+        5: '#94a3b8', // Gray-blue
         wait: '#475569',
         text: '#cbd5e1',
         grid: '#334155'
@@ -39,6 +41,8 @@ async function init() {
 
             if (mode === 'original' && window.DATA_ORIGINAL) {
                 data = window.DATA_ORIGINAL;
+            } else if (mode === 'fcfs' && window.DATA_FCFS) {
+                data = window.DATA_FCFS;
             } else if (mode === 'predictive' && window.DATA_PREDICTIVE) {
                 data = window.DATA_PREDICTIVE;
             }

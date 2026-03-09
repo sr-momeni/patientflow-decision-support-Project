@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ER Triage Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #22263a;
+            --border: #2e3250;
+            --accent: #4f7cff;
+            --accent-glow: rgba(79, 124, 255, 0.25);
+            --text: #e8eaf0;
+            --text-dim: #8b90a8;
+            --bubble-user: #2a3060;
+            --bubble-ai: #1e2235;
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── Header ── */
+        header {
+            width: 100%;
+            padding: 18px 32px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-badge {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 4px 10px;
+            background: rgba(79, 124, 255, 0.15);
+            border: 1px solid rgba(79, 124, 255, 0.3);
+            border-radius: 20px;
+            color: var(--accent);
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Layout ── */
+        .chat-wrapper {
+            width: 100%;
+            max-width: 780px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 24px 16px 0;
+            gap: 16px;
+        }
+
+        /* ── Voice orb ── */
+        .orb-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 24px 0 10px;
+        }
+
+        .orb-wrap {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .orb {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #6b9fff, #2a52cc);
+            box-shadow: 0 0 30px rgba(79, 124, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .orb.listening {
+            animation: orbPulse 1.4s ease-in-out infinite;
+            box-shadow: 0 0 50px rgba(79, 124, 255, 0.7);
+        }
+
+        .orb.speaking {
+            background: radial-gradient(circle at 35% 35%, #6fffa0, #1a9c55);
+            box-shadow: 0 0 50px rgba(39, 174, 96, 0.6);
+            animation: orbPulse 0.8s ease-in-out infinite;
+        }
+
+        .orb.waiting {
+            background: radial-gradient(circle at 35% 35%, #aaaacc, #444466);
+            box-shadow: 0 0 16px rgba(100, 100, 160, 0.3);
+        }
+
+        @keyframes orbPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.08);
+            }
+        }
+
+        /* Ripple rings while listening */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(79, 124, 255, 0.3);
+            animation: rippleOut 2s ease-out infinite;
+            pointer-events: none;
+        }
+
+        .ripple:nth-child(2) {
+            animation-delay: 0.5s;
+        }
+
+        .ripple:nth-child(3) {
+            animation-delay: 1s;
+        }
+
+        @keyframes rippleOut {
+            0% {
+                width: 80px;
+                height: 80px;
+                opacity: 0.7;
+            }
+
+            100% {
+                width: 140px;
+                height: 140px;
+                opacity: 0;
+            }
+        }
+
+        .orb-label {
+            font-size: 13px;
+            color: var(--text-dim);
+            text-align: center;
+            min-height: 20px;
+        }
+
+        /* ── Status bar ── */
+        #status-bar {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 16px;
+            font-size: 13px;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #status-bar .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        #status-bar.listening .dot {
+            background: var(--accent);
+            animation: blink 1s infinite;
+        }
+
+        #status-bar.speaking .dot {
+            background: #2ecc71;
+            animation: blink 0.8s infinite;
+        }
+
+        #status-bar.thinking .dot {
+            background: #e67e22;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.25
+            }
+        }
+
+        /* ── Chat log ── */
+        #chat-log {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-bottom: 8px;
+            scroll-behavior: smooth;
+        }
+
+        #chat-log::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #chat-log::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .bubble-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            animation: fadeUp 0.25s ease;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .bubble-row.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .avatar.ai {
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        .avatar.user {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+        }
+
+        .bubble {
+            max-width: 72%;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .bubble.ai {
+            background: var(--bubble-ai);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .bubble.user {
+            background: var(--bubble-user);
+            border-bottom-right-radius: 4px;
+        }
+
+        /* ── Result card ── */
+        #result-card {
+            display: none;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            animation: fadeUp 0.35s ease;
+            margin-bottom: 16px;
+        }
+
+        .result-header {
+            padding: 20px 24px 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ctas-badge {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .ctas-badge .num {
+            font-size: 28px;
+            line-height: 1;
+        }
+
+        .ctas-badge .lbl {
+            font-size: 9px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .result-title h2 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .result-title p {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-top: 3px;
+        }
+
+        .result-summary {
+            padding: 14px 24px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 14px;
+            line-height: 1.65;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border);
+        }
+
+        .result-summary strong {
+            color: var(--text);
+        }
+
+        /* ── Controls ── */
+        .controls {
+            position: sticky;
+            bottom: 0;
+            background: var(--bg);
+            padding: 12px 0 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #start-btn {
+            background: var(--accent);
+            border: none;
+            border-radius: 50px;
+            padding: 14px 36px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 0 24px var(--accent-glow);
+            transition: opacity 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #start-btn:hover {
+            opacity: 0.88;
+            transform: scale(1.03);
+        }
+
+        #start-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #end-btn {
+            background: rgba(192, 57, 43, 0.15);
+            border: 1px solid rgba(192, 57, 43, 0.4);
+            border-radius: 50px;
+            padding: 10px 28px;
+            color: #e57373;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: none;
+            transition: background 0.2s;
+        }
+
+        #end-btn:hover {
+            background: rgba(192, 57, 43, 0.25);
+        }
+
+        #reset-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 8px 20px;
+            color: var(--text-dim);
+            font-size: 13px;
+            cursor: pointer;
+            display: none;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        #reset-btn:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        /* hidden audio element */
+        #ai-audio {
+            display: none;
+        }
+
+        /* ── Debug log ── */
+        #debug-panel {
+            width: 100%;
+            background: #0a0c10;
+            border-top: 1px solid #1e2235;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        #debug-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #1e2235;
+            color: #5a6080;
+            user-select: none;
+        }
+
+        #debug-header:hover {
+            color: #8b90a8;
+        }
+
+        #debug-header span {
+            margin-left: auto;
+            font-size: 10px;
+        }
+
+        #debug-log {
+            height: 200px;
+            overflow-y: auto;
+            padding: 8px 16px;
+        }
+
+        #debug-log::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        #debug-log::-webkit-scrollbar-thumb {
+            background: #2e3250;
+        }
+
+        .log-entry {
+            padding: 1px 0;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-entry.info {
+            color: #8b90a8;
+        }
+
+        .log-entry.event {
+            color: #4f7cff;
+        }
+
+        .log-entry.audio {
+            color: #2ecc71;
+        }
+
+        .log-entry.warning {
+            color: #e67e22;
+        }
+
+        .log-entry.error {
+            color: #e74c3c;
+        }
+
+        .log-entry.send {
+            color: #9b59b6;
+        }
+
+        #clear-log {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #5a6080;
+            font-size: 10px;
+            padding: 0 4px;
+        }
+
+        #clear-log:hover {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-icon">🏥</div>
+        <h1>ER Triage Assistant</h1>
+        <span class="header-badge">⚡ Realtime Voice · CTAS</span>
+    </header>
+
+    <audio id="ai-audio" autoplay></audio>
+
+    <div class="chat-wrapper">
+
+        <div id="status-bar" class="">
+            <div class="dot"></div><span id="status-text">Press Start to begin your voice assessment.</span>
+        </div>
+
+        <!-- Voice orb (shown while session is active) -->
+        <div class="orb-container" id="orb-section" style="display:none">
+            <div class="orb-wrap" id="orb-wrap">
+                <div class="orb waiting" id="orb">🩺</div>
+            </div>
+            <div class="orb-label" id="orb-label">Connecting…</div>
+        </div>
+
+        <div id="chat-log"></div>
+
+        <div id="result-card">
+            <div class="result-header">
+                <div class="ctas-badge" id="result-badge"><span class="num" id="result-num">—</span><span
+                        class="lbl">CTAS</span></div>
+                <div class="result-title">
+                    <h2 id="result-name">—</h2>
+                    <p id="result-desc">—</p>
+                </div>
+            </div>
+            <div class="result-summary" id="result-summary">—</div>
+        </div>
+
+        <div class="controls">
+            <button id="start-btn">🎙️ Start Voice Assessment</button>
+            <button id="end-btn">✕ End Assessment</button>
+            <button id="reset-btn">↺ New Assessment</button>
+        </div>
+
+    </div><!-- /chat-wrapper -->
+
+    <!-- Debug log panel -->
+    <div id="debug-panel" style="max-width:780px;width:100%;margin:0 auto;">
+        <div id="debug-header" onclick="toggleDebug()">
+            🔍 <strong>Debug Log</strong>
+            <button id="clear-log" onclick="event.stopPropagation();clearLog()">✕ clear</button>
+            <span id="debug-toggle">▲ hide</span>
+        </div>
+        <div id="debug-log"></div>
+    </div>
+
+    <script>
+        // ── Elements ──────────────────────────────────────────────────────────────
+        const statusBar = document.getElementById('status-bar');
+        const statusText = document.getElementById('status-text');
+        const chatLog = document.getElementById('chat-log');
+        const orbSection = document.getElementById('orb-section');
+        const orbWrap = document.getElementById('orb-wrap');
+        const orb = document.getElementById('orb');
+        const orbLabel = document.getElementById('orb-label');
+        const startBtn = document.getElementById('start-btn');
+        const endBtn = document.getElementById('end-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const aiAudio = document.getElementById('ai-audio');
+        const resultCard = document.getElementById('result-card');
+        const debugLog = document.getElementById('debug-log');
+
+        // ── Debug logger ──────────────────────────────────────────────────────────
+        function log(msg, type = 'info') {
+            const ts = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
+            const el = document.createElement('div');
+            el.className = `log-entry ${type}`;
+            el.textContent = `[${ts}] ${msg}`;
+            debugLog.appendChild(el);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${type}] ${msg}`);
+        }
+        function toggleDebug() {
+            const panel = document.getElementById('debug-log');
+            const tog = document.getElementById('debug-toggle');
+            if (panel.style.display === 'none') { panel.style.display = 'block'; tog.textContent = '▲ hide'; }
+            else { panel.style.display = 'none'; tog.textContent = '▼ show'; }
+        }
+        function clearLog() { debugLog.innerHTML = ''; }
+
+        // ── State ──────────────────────────────────────────────────────────────────
+        let pc = null;       // RTCPeerConnection
+        let dc = null;       // DataChannel
+        let sessionActive = false;
+        let currentAiText = '';   // accumulate streaming AI transcript
+
+        // ── Helpers ────────────────────────────────────────────────────────────────
+        function setStatus(state, text) {
+            statusBar.className = state;
+            statusText.textContent = text;
+        }
+
+        function setOrb(state) {
+            // state: 'waiting' | 'listening' | 'speaking'
+            orb.className = `orb ${state}`;
+            // ripple rings only when listening
+            orbWrap.querySelectorAll('.ripple').forEach(r => r.remove());
+            if (state === 'listening') {
+                for (let i = 0; i < 3; i++) {
+                    const r = document.createElement('div');
+                    r.className = 'ripple';
+                    orbWrap.appendChild(r);
+                }
+                orbLabel.textContent = 'Listening… speak now';
+                setStatus('listening', 'Listening to you…');
+            } else if (state === 'speaking') {
+                orbLabel.textContent = 'Assistant is speaking…';
+                setStatus('speaking', 'Assistant is speaking…');
+            } else {
+                orbLabel.textContent = 'Ready — speak when you\'re ready';
+                setStatus('', 'Say something when you\'re ready.');
+            }
+        }
+
+        function addBubble(role, text) {
+            if (!text.trim()) return;
+            const row = document.createElement('div');
+            row.className = `bubble-row ${role}`;
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${role}`;
+            avatar.textContent = role === 'ai' ? '🏥' : '🧑';
+            const bubble = document.createElement('div');
+            bubble.className = `bubble ${role}`;
+            bubble.textContent = text;
+            row.appendChild(avatar);
+            row.appendChild(bubble);
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            return bubble;
+        }
+
+        function showResult(result) {
+            document.getElementById('result-num').textContent = result.ctas_level;
+            document.getElementById('result-name').textContent = `CTAS ${result.ctas_level} — ${result.ctas_name}`;
+            document.getElementById('result-desc').textContent = result.ctas_description;
+            document.getElementById('result-badge').style.background = result.color;
+            document.getElementById('result-summary').innerHTML =
+                `<strong>Clinical Summary:</strong> ${result.summary}`;
+            resultCard.style.display = 'block';
+            resultCard.scrollIntoView({ behavior: 'smooth' });
+            resetBtn.style.display = 'block';
+            endSession();
+        }
+
+        // ── Realtime API — WebRTC Setup ────────────────────────────────────────────
+        async function startSession() {
+            log('▶ START button clicked', 'info');
+            startBtn.disabled = true;
+            setStatus('thinking', 'Connecting to OpenAI Realtime…');
+
+            try {
+                // 1. Get ephemeral token from our backend
+                log('→ POST /chatbot/realtime-session', 'send');
+                const tokenResp = await fetch('/chatbot/realtime-session', { method: 'POST' });
+                log(`← session response: ${tokenResp.status} ${tokenResp.statusText}`, tokenResp.ok ? 'info' : 'error');
+                if (!tokenResp.ok) {
+                    const err = await tokenResp.json().catch(() => ({}));
+                    throw new Error(err.detail || `Session creation failed (${tokenResp.status})`);
+                }
+                const sessionData = await tokenResp.json();
+                log(`← session keys: ${Object.keys(sessionData).join(', ')}`, 'info');
+                const ephemeralKey = sessionData?.client_secret?.value;
+                if (!ephemeralKey) throw new Error('No ephemeral key returned from server.');
+                log(`← ephemeral key obtained (length ${ephemeralKey.length})`, 'info');
+
+                // 2. Set up WebRTC peer connection
+                log('Setting up RTCPeerConnection…', 'info');
+                pc = new RTCPeerConnection();
+                pc.onconnectionstatechange = () => log(`PeerConnection state: ${pc.connectionState}`, 'info');
+                pc.oniceconnectionstatechange = () => log(`ICE state: ${pc.iceConnectionState}`, 'info');
+                pc.onicegatheringstatechange = () => log(`ICE gathering: ${pc.iceGatheringState}`, 'info');
+
+                // 3. Remote audio → play it
+                pc.ontrack = (e) => {
+                    log(`▶ Remote audio track received: kind=${e.track.kind}`, 'audio');
+                    aiAudio.srcObject = e.streams[0];
+                };
+
+                // 4. Mic input → add track
+                log('Requesting microphone…', 'info');
+                const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log(`🎤 Microphone granted — tracks: ${micStream.getTracks().map(t => t.label).join(', ')}`, 'audio');
+                pc.addTrack(micStream.getTracks()[0]);
+
+                // 5. Data channel for events
+                log('Creating data channel…', 'info');
+                dc = pc.createDataChannel('oai-events');
+                dc.onopen = onDataChannelOpen;
+                dc.onmessage = onDataChannelMessage;
+                dc.onclose = () => log('DataChannel closed', 'warning');
+                dc.onerror = (e) => log(`DataChannel error: ${e}`, 'error');
+
+                // 6. Create SDP offer
+                log('Creating SDP offer…', 'info');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                log(`SDP offer created (${offer.sdp.length} chars)`, 'info');
+
+                // 7. Exchange SDP with OpenAI
+                log('→ POST SDP to OpenAI Realtime…', 'send');
+                const sdpResp = await fetch(
+                    'https://api.openai.com/v1/realtime?model=gpt-realtime-2025-08-28',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${ephemeralKey}`,
+                            'Content-Type': 'application/sdp',
+                        },
+                        body: offer.sdp,
+                    }
+                );
+                log(`← SDP response: ${sdpResp.status} ${sdpResp.statusText}`, sdpResp.ok ? 'info' : 'error');
+                if (!sdpResp.ok) throw new Error(`WebRTC handshake failed: ${sdpResp.status}`);
+
+                const answerSdp = await sdpResp.text();
+                log(`SDP answer received (${answerSdp.length} chars) — setting remote description`, 'info');
+                await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+                log('✅ WebRTC connected', 'info');
+
+                sessionActive = true;
+                orbSection.style.display = 'flex';
+                endBtn.style.display = 'block';
+                setOrb('waiting');
+
+            } catch (err) {
+                log(`❌ Session error: ${err.message}`, 'error');
+                console.error('Session error:', err);
+                setStatus('', `⚠️ ${err.message}`);
+                startBtn.disabled = false;
+            }
+        }
+
+        // ── Data channel events ────────────────────────────────────────────────────
+        function onDataChannelOpen() {
+            log('✅ DataChannel open — sending response.create for greeting', 'info');
+            // Just ask GPT to generate the opening greeting from the system prompt.
+            // No fake user turn — that collides with live VAD mic audio.
+            sendEvent({ type: 'response.create' });
+        }
+
+        function onDataChannelMessage(e) {
+            let event;
+            try { event = JSON.parse(e.data); }
+            catch { log(`Unparseable message: ${e.data}`, 'error'); return; }
+
+            // Log everything — suppress noisy delta events to keep log readable
+            if (event.type === 'response.audio_transcript.delta') {
+                // skip — too frequent
+            } else if (event.type === 'response.audio.delta') {
+                // skip audio byte deltas
+            } else {
+                const payload = JSON.stringify(event).slice(0, 300);
+                const cat = event.type.startsWith('error') ? 'error'
+                    : event.type.includes('audio') ? 'audio'
+                        : event.type.includes('speech') ? 'audio'
+                            : 'event';
+                log(`← ${event.type}  ${payload}`, cat);
+            }
+
+            switch (event.type) {
+
+                // ── Session ready ──
+                case 'session.created':
+                case 'session.updated':
+                    setOrb('waiting');
+                    break;
+
+                // ── User speech activity ──
+                case 'input_audio_buffer.speech_started':
+                    setOrb('listening');
+                    break;
+
+                case 'input_audio_buffer.speech_stopped':
+                    setOrb('waiting');
+                    setStatus('thinking', 'Processing…');
+                    break;
+
+                // ── User transcript (after VAD detects end of speech) ──
+                case 'conversation.item.input_audio_transcription.completed':
+                    addBubble('user', event.transcript || '');
+                    break;
+
+                // ── AI response: audio starts ──
+                case 'response.audio.delta':
+                    setOrb('speaking');
+                    break;
+
+                // ── AI transcript streaming ──
+                case 'response.audio_transcript.delta':
+                    currentAiText += event.delta || '';
+                    break;
+
+                // ── AI transcript complete — show in chat ──
+                case 'response.audio_transcript.done':
+                    if (currentAiText.trim()) addBubble('ai', currentAiText.trim());
+                    currentAiText = '';
+                    break;
+
+                // ── AI finished speaking ──
+                case 'response.audio.done':
+                    setOrb('waiting');
+                    break;
+
+                // ── Function call (complete_triage) ──
+                case 'response.done':
+                    handleResponseDone(event.response);
+                    break;
+
+                // ── Errors ──
+                case 'error':
+                    console.error('Realtime API error:', event.error);
+                    setStatus('', `⚠️ Error: ${event.error?.message || 'Unknown error'}`);
+                    break;
+            }
+        }
+
+        async function handleResponseDone(response) {
+            if (!response?.output) return;
+            for (const item of response.output) {
+                if (item.type === 'function_call' && item.name === 'complete_triage') {
+                    try {
+                        const clinicalData = JSON.parse(item.arguments);
+                        // Send result to our backend scorer
+                        const scoreResp = await fetch('/chatbot/score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clinical_data: clinicalData }),
+                        });
+                        if (!scoreResp.ok) throw new Error('Scoring failed');
+                        const result = await scoreResp.json();
+                        showResult(result);
+
+                        // Acknowledge function call so the session knows it was handled
+                        sendEvent({
+                            type: 'conversation.item.create',
+                            item: {
+                                type: 'function_call_output',
+                                call_id: item.call_id,
+                                output: JSON.stringify({ status: 'done', ctas_level: result.ctas_level }),
+                            },
+                        });
+                    } catch (err) {
+                        console.error('complete_triage handling error:', err);
+                        addBubble('ai', '⚠️ Could not calculate urgency level. Please try again.');
+                    }
+                }
+            }
+        }
+
+        function sendEvent(obj) {
+            if (dc && dc.readyState === 'open') {
+                log(`→ send: ${obj.type}`, 'send');
+                dc.send(JSON.stringify(obj));
+            } else {
+                log(`⚠ sendEvent called but dc not open (state: ${dc?.readyState})`, 'warning');
+            }
+        }
+
+        // ── Session control ────────────────────────────────────────────────────────
+        function endSession() {
+            sessionActive = false;
+            if (pc) { pc.close(); pc = null; }
+            dc = null;
+            endBtn.style.display = 'none';
+            orbSection.style.display = 'none';
+            startBtn.disabled = true;
+            setStatus('', 'Session ended.');
+        }
+
+        function resetAll() {
+            endSession();
+            chatLog.innerHTML = '';
+            resultCard.style.display = 'none';
+            resetBtn.style.display = 'none';
+            startBtn.disabled = false;
+            currentAiText = '';
+            setStatus('', 'Press Start to begin your voice assessment.');
+        }
+
+        // ── Button listeners ───────────────────────────────────────────────────────
+        startBtn.addEventListener('click', startSession);
+        endBtn.addEventListener('click', () => { endSession(); resetBtn.style.display = 'block'; });
+        resetBtn.addEventListener('click', resetAll);
+    </script>
+</body>
+
+</html>

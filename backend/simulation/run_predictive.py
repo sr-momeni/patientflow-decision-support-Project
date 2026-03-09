@@ -19,11 +19,16 @@ def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capac
     for _, row in df.iterrows():
         bed_type = str(row['bed_assigned_type']).strip().upper()
         
+        # FIX: The input CSV's 'los_minutes' includes original wait time.
+        # We need NET service duration to avoid 'snowballing' wait times in simulation.
+        orig_wait = float(row.get('waiting_time_minutes', 0))
+        net_los = max(1.0, float(row['los_minutes']) - orig_wait)
+        
         sim_p = SimulationPatient(
             id=row['patient_id'],
             arrival=parser.parse(row['arrival_ts']),
             urgency=int(row['urgency_level']),
-            los_minutes=float(row['los_minutes']),
+            los_minutes=net_los,
             bed_type=bed_type
         )
         patients.append(sim_p)
@@ -54,7 +59,7 @@ def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capac
             "assessment_start_ts": p.service_start.isoformat(),
             "discharge_ts": p.discharge.isoformat(),
             "waiting_time_minutes": p.wait_minutes,
-            "los_minutes": p.los_minutes
+            "los_minutes": p.wait_minutes + p.los_minutes # Total LOS (Wait + Service)
         })
     
     df_out = pd.DataFrame(results)
@@ -69,7 +74,7 @@ def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capac
     print(f"\n=== Predictive Simulation Results ===")
     print(f"Average waiting time: {avg_wait:.2f} minutes")
     
-    for urgency in [1, 2, 3]:
+    for urgency in [1, 2, 3, 4, 5]:
         urgency_df = df_out[df_out['urgency_level'] == urgency]
         avg_urgency_wait = urgency_df['waiting_time_minutes'].mean()
         print(f"Level {urgency} avg wait: {avg_urgency_wait:.2f} minutes")

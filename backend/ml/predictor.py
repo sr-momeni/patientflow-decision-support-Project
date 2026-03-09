@@ -36,18 +36,8 @@ class HighUrgencyPredictor:
     
     def train(self, arrivals_data: List[Dict]) -> Dict:
         """
-        Train the model on historical arrival data.
-        
-        Args:
-            arrivals_data: List of dicts with keys: 
-                - 'arrival_ts': datetime
-                - 'urgency': int
-                - 'ed_occupancy': float
-                - 'icu_occupancy': float
-                - 'recent_rate': float
-        
-        Returns:
-            Dict with training metrics
+        Train the model on historical arrival data using multiclass labels.
+        Labels: 0 (No arrival), 1-5 (Levels 1-5)
         """
         X = []
         y = []
@@ -65,23 +55,25 @@ class HighUrgencyPredictor:
             ]
             X.append(features)
             
-            # Label: Was there a high-urgency arrival in next window?
-            # We need to look ahead in the data
+            # Label: What was the highest urgency arrival in next window?
             future_window_end = ts + timedelta(minutes=self.prediction_window_minutes)
-            has_urgent = False
             
-            for j in range(i, min(i + 50, len(arrivals_data))):  # Look ahead
+            # 0 means no arrival in window
+            best_urgency = 0 
+            
+            for j in range(i, min(i + 100, len(arrivals_data))): # Increased lookahead
                 next_arrival = arrivals_data[j]
                 next_ts = next_arrival['arrival_ts']
                 
                 if next_ts > future_window_end:
                     break
+                
+                urgency = next_arrival['urgency']
+                # If we find a more urgent patient (lower number), it becomes the label
+                if best_urgency == 0 or (urgency > 0 and urgency < best_urgency):
+                    best_urgency = urgency
                     
-                if next_arrival['urgency'] == 1:  # Urgency level 1
-                    has_urgent = True
-                    break
-                    
-            y.append(1 if has_urgent else 0)
+            y.append(best_urgency)
         
         X = np.array(X)
         y = np.array(y)
@@ -97,9 +89,15 @@ class HighUrgencyPredictor:
         
         # Evaluate
         y_pred = self.model.predict(X_test)
+        
+        # Use macro average for multiclass metrics
         precision, recall, f1, _ = precision_recall_fscore_support(
-            y_test, y_pred, average='binary'
+            y_test, y_pred, average='macro', zero_division=0
         )
+        
+        # Class distribution for diagnostics
+        unique, counts = np.unique(y, return_counts=True)
+        dist = dict(zip(unique.tolist(), (counts / len(y)).tolist()))
         
         return {
             'precision': precision,
@@ -107,23 +105,32 @@ class HighUrgencyPredictor:
             'f1': f1,
             'train_size': len(X_train),
             'test_size': len(X_test),
-            'positive_class_ratio': y.mean()
+            'class_distribution': dist
         }
     
     def predict(self, timestamp: datetime, ed_occupancy: float, 
-                icu_occupancy: float, recent_rate: float) -> float:
+                icu_occupancy: float, recent_rate: float) -> Dict[int, float]:
         """
-        Predict probability of high-urgency arrival in next window.
+        Predict probability distribution of arrivals in next window.
         
         Returns:
-            Probability between 0 and 1
+            Dict mapping class (0-5) to probability
         """
         if not self.is_trained:
             raise ValueError("Model must be trained before prediction")
             
         features = self._extract_features(timestamp, ed_occupancy, icu_occupancy, recent_rate)
-        proba = self.model.predict_proba(features)[0, 1]  # Probability of class 1
-        return proba
+        probas = self.model.predict_proba(features)[0]
+        classes = self.model.classes_
+        
+        result = {int(c): float(p) for c, p in zip(classes, probas)}
+        
+        # Ensure all levels 0-5 are present for consistency, even if 0 probability
+        for i in range(6):
+            if i not in result:
+                result[i] = 0.0
+                
+        return result
     
     def save(self, path: str):
         """Save trained model to disk."""

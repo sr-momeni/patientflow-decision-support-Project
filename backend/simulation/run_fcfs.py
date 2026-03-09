@@ -18,11 +18,15 @@ def run_fcfs_simulation(input_path, output_path, ed_capacity=50, icu_capacity=20
         # Clean bed type
         bed_type = str(row['bed_assigned_type']).strip().upper()
         
+        # FIX: Net service duration calculation
+        orig_wait = float(row.get('waiting_time_minutes', 0))
+        net_los = max(1.0, float(row['los_minutes']) - orig_wait)
+        
         sim_p = SimulationPatient(
             id=row['patient_id'],
             arrival=parser.parse(row['arrival_ts']),
             urgency=int(row['urgency_level']),
-            los_minutes=float(row['los_minutes']),
+            los_minutes=net_los,
             bed_type=bed_type
         )
         patients.append(sim_p)
@@ -47,7 +51,7 @@ def run_fcfs_simulation(input_path, output_path, ed_capacity=50, icu_capacity=20
             "assessment_start_ts": p.service_start.isoformat(),
             "discharge_ts": p.discharge.isoformat(),
             "waiting_time_minutes": p.wait_minutes,
-            "los_minutes": p.los_minutes
+            "los_minutes": p.wait_minutes + p.los_minutes # Total LOS (Wait + Service)
         })
         
     df_out = pd.DataFrame(results)
@@ -56,6 +60,17 @@ def run_fcfs_simulation(input_path, output_path, ed_capacity=50, icu_capacity=20
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_out.to_csv(output_path, index=False)
     print(f"Saved FCFS results to {output_path}")
+    
+    # 4. Print Statistics
+    avg_wait = df_out['waiting_time_minutes'].mean()
+    print(f"\n=== FCFS Simulation Results ===")
+    print(f"Average waiting time: {avg_wait:.2f} minutes")
+    
+    for urgency in [1, 2, 3, 4, 5]:
+        urgency_df = df_out[df_out['urgency_level'] == urgency]
+        if not urgency_df.empty:
+            avg_urgency_wait = urgency_df['waiting_time_minutes'].mean()
+            print(f"Level {urgency} avg wait: {avg_urgency_wait:.2f} minutes")
 
 if __name__ == "__main__":
     run_fcfs_simulation('data/patients_2500.csv', 'data/patients_fcfs.csv')

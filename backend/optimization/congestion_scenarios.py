@@ -61,7 +61,7 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
-        arrival_rates_per_hour={1: 2.0, 2: 8.0, 3: 12.0},
+        arrival_rates_per_hour={1: 2.0, 2: 8.0, 3: 12.0, 4: 8.0, 5: 4.0},
         senior_staff_available=True,
         ed_near_full_threshold=0.85,
         arrival_rates_per_hour={
@@ -85,7 +85,7 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         nurses=18,
         lab_slots_per_hour=18,
         imaging_slots_per_hour=12,
-        arrival_rates_per_hour={1: 2.2, 2: 12.0, 3: 20.0},
+        arrival_rates_per_hour={1: 2.2, 2: 12.0, 3: 20.0, 4: 15.0, 5: 5.0},
         senior_staff_available=True,
         ed_near_full_threshold=0.9,
         arrival_rates_per_hour={
@@ -108,7 +108,7 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         nurses=22,
         lab_slots_per_hour=22,
         imaging_slots_per_hour=14,
-        arrival_rates_per_hour={1: 3.0, 2: 9.0, 3: 12.0},
+        arrival_rates_per_hour={1: 3.0, 2: 9.0, 3: 12.0, 4: 10.0, 5: 4.0},
         senior_staff_available=True,
         ed_near_full_threshold=0.9,
         arrival_rates_per_hour={

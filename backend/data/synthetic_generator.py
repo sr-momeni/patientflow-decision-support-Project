@@ -58,8 +58,8 @@ class PatientEvent:
 def _choose_urgency_levels(n: int, scenario: ScenarioConfig) -> List[int]:
     rates = scenario.arrival_rates_per_hour
     total = sum(rates.values())
-    weights = [rates[level] / total for level in (1, 2, 3)]
-    return random.choices(population=[1, 2, 3], weights=weights, k=n)
+    weights = [rates[level] / total for level in (1, 2, 3, 4, 5)]
+    return random.choices(population=[1, 2, 3, 4, 5], weights=weights, k=n)
 
 
 def _arrival_minutes(n: int) -> List[float]:
@@ -92,10 +92,12 @@ def _probabilities_by_level(level: int) -> Dict[str, float]:
         1: (0.7, 0.05, 0.25),  # ambulance, walk-in, transfer
         2: (0.3, 0.65, 0.05),
         3: (0.05, 0.9, 0.05),
+        4: (0.02, 0.95, 0.03),
+        5: (0.01, 0.98, 0.01),
     }
-    lab = {1: 0.8, 2: 0.6, 3: 0.3}
-    imaging = {1: 0.6, 2: 0.4, 3: 0.15}
-    icu_need = {1: 0.7, 2: 0.15, 3: 0.0}
+    lab = {1: 0.8, 2: 0.6, 3: 0.3, 4: 0.15, 5: 0.05}
+    imaging = {1: 0.6, 2: 0.4, 3: 0.15, 4: 0.05, 5: 0.02}
+    icu_need = {1: 0.7, 2: 0.15, 3: 0.0, 4: 0.0, 5: 0.0}
     return {
         "arrival_mode_ambulance": arrival_mode[level][0],
         "arrival_mode_walkin": arrival_mode[level][1],
@@ -111,7 +113,11 @@ def _base_service_minutes(level: int) -> float:
         return random.uniform(240, 420)
     if level == 2:
         return random.uniform(120, 240)
-    return random.uniform(60, 120)
+    if level == 3:
+        return random.uniform(60, 120)
+    if level == 4:
+        return random.uniform(45, 90)
+    return random.uniform(30, 60)
 
 
 def generate_events(
@@ -315,7 +321,7 @@ def main() -> None:
     print(f"Generated {summary['count']} records for scenario '{scenario.name}' -> {output_path}")
     print(f"Average waiting time: {summary['avg_wait']} minutes")
     print(f"Average LOS: {summary['avg_los']} minutes")
-    for level in (1, 2, 3):
+    for level in (1, 2, 3, 4, 5):
         key = f"avg_wait_level_{level}"
         if key in summary:
             print(f"Level {level} avg wait: {summary[key]} minutes")

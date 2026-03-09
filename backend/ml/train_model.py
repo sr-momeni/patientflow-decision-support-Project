@@ -63,13 +63,18 @@ def main():
     predictor = HighUrgencyPredictor(prediction_window_minutes=30)
     metrics = predictor.train(training_data)
     
-    print("\n=== Training Results ===")
-    print(f"Precision: {metrics['precision']:.3f}")
-    print(f"Recall: {metrics['recall']:.3f}")
-    print(f"F1-Score: {metrics['f1']:.3f}")
-    print(f"Training samples: {metrics['train_size']}")
-    print(f"Test samples: {metrics['test_size']}")
-    print(f"Positive class ratio: {metrics['positive_class_ratio']:.3f}")
+    print("\n=== Training Results (Multiclass) ===")
+    print(f"Macro Precision: {metrics.get('precision', 0):.3f}")
+    print(f"Macro Recall: {metrics.get('recall', 0):.3f}")
+    print(f"Macro F1-Score: {metrics.get('f1', 0):.3f}")
+    print(f"Training samples: {metrics.get('train_size', 0)}")
+    print(f"Test samples: {metrics.get('test_size', 0)}")
+    
+    print("\nTarget Class Distribution:")
+    dist = metrics.get('class_distribution', {})
+    for cls in sorted(dist.keys()):
+        label = "No Arrival" if cls == 0 else f"Level {cls}"
+        print(f"  {label:12}: {dist[cls]:.2%}")
     
     # Save model
     os.makedirs('models', exist_ok=True)

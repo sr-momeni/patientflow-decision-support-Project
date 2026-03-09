@@ -32,8 +32,9 @@
         <div class="controls">
             <select id="data-source-select"
                 style="margin-right: 15px; padding: 5px; background: #334155; color: white; border: 1px solid #475569; border-radius: 4px;">
-                <option value="original">Original Data</option>
-                <option value="predictive">Predictive AI Allocation</option>
+                <option value="original">Synthetic Data (Raw)</option>
+                <option value="fcfs">FCFS Simulation (Baseline)</option>
+                <option value="predictive">AI Predictive Allocation</option>
             </select>
             <button id="zoom-in">+</button>
             <button id="zoom-out">-</button>
@@ -42,7 +43,8 @@
                 style="background: #2563eb; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">+
                 New Triage</button>
             <a href="/" style="margin-left: 10px; text-decoration: none;">
-                <button style="background: #475569; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                <button
+                    style="background: #475569; color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-weight: 600;">
                     Go to Home
                 </button>
             </a>
@@ -173,14 +175,17 @@
         </main>
 
         <div class="legend">
-            <div class="legend-item"><span class="dot u1"></span> Urgency 1 (Critical)</div>
-            <div class="legend-item"><span class="dot u2"></span> Urgency 2 (Urgent)</div>
-            <div class="legend-item"><span class="dot u3"></span> Urgency 3 (Standard)</div>
-            <div class="legend-item"><span class="bar-sample wait"></span> Waiting</div>
-            <div class="legend-item"><span class="bar-sample service"></span> In Treatment</div>
+            <div class="legend-item"><span class="dot u1"></span> Level 1 (Critical)</div>
+            <div class="legend-item"><span class="dot u2"></span> Level 2 (Urgent)</div>
+            <div class="legend-item"><span class="dot u3"></span> Level 3 (Emergent)</div>
+            <div class="legend-item"><span class="dot u4"></span> Level 4 (Standard)</div>
+            <div class="legend-item"><span class="dot u5"></span> Level 5 (Non-Urgent)</div>
+            <div class="legend-item"><span class="bar-sample wait"></span> Waiting Room</div>
+            <div class="legend-item"><span class="bar-sample service"></span> In Treatment Card</div>
         </div>
     </div>
     <script src="data_original.js"></script>
+    <script src="data_fcfs.js"></script>
     <script src="data_predictive.js"></script>
     <script src="script.js"></script>
 </body>
