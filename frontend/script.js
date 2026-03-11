@@ -1,14 +1,15 @@
 
 const CONFIG = {
-    laneHeight: 30,
+    laneHeight: 30,   // recalculated dynamically after packing
     lanePadding: 4,
-    timeScale: 60 * 1000, // 1 minute per pixel (initial)
+    maxCanvasHeight: 8000, // cap so scrolling stays manageable
+    timeScale: 60 * 1000,
     colors: {
-        1: '#ef4444', // Red
-        2: '#f97316', // Orange
-        3: '#10b981', // Green
-        4: '#22d3ee', // Cyan
-        5: '#94a3b8', // Gray-blue
+        1: '#ef4444',
+        2: '#f97316',
+        3: '#10b981',
+        4: '#22d3ee',
+        5: '#94a3b8',
         wait: '#475569',
         text: '#cbd5e1',
         grid: '#334155'
@@ -105,75 +106,118 @@ function processData(data) {
     const totalLos = state.patients.reduce((acc, p) => acc + p.los_minutes, 0);
     const avgLos = (totalLos / state.patients.length).toFixed(1);
     document.getElementById('avg-los').textContent = `${avgLos}m`;
+
+    // Auto-fit: zoom to show the entire dataset across the container width
+    if (state.minDate && state.maxDate) {
+        const totalMs = state.maxDate.getTime() - state.minDate.getTime();
+        const usableWidth = Math.max(state.containerWidth, window.innerWidth) - 60;
+        const fitZoom = totalMs / usableWidth;
+        state.zoomLevel = Math.max(fitZoom, 1000 * 15);
+        state.viewOffset = 0;
+    }
+
+    // Per-level average wait times
+    const waitByLevel = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    let edServiceMin = 0, icuServiceMin = 0;
+
+    state.patients.forEach(p => {
+        if (waitByLevel[p.urgency]) waitByLevel[p.urgency].push(p.wait_minutes);
+        const svc = p.los_minutes - p.wait_minutes;
+        if (p.bed_type === 'ICU') icuServiceMin += svc;
+        else edServiceMin += svc;
+    });
+
+    [1, 2, 3, 4, 5].forEach(lvl => {
+        const arr = waitByLevel[lvl];
+        const avg = arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+        const el = document.getElementById(`wait-l${lvl}`);
+        if (el) el.textContent = `${avg.toFixed(0)}m`;
+    });
+
+    // Bed occupancy rate
+    if (state.minDate && state.maxDate) {
+        const simMin = (state.maxDate.getTime() - state.minDate.getTime()) / 60000;
+        const edOccupancy = simMin > 0 ? (edServiceMin / (50 * simMin) * 100) : 0;
+        const icuOccupancy = simMin > 0 ? (icuServiceMin / (20 * simMin) * 100) : 0;
+        const edEl = document.getElementById('ed-occupancy');
+        const icuEl = document.getElementById('icu-occupancy');
+        if (edEl) edEl.textContent = `${edOccupancy.toFixed(1)}%`;
+        if (icuEl) icuEl.textContent = `${icuOccupancy.toFixed(1)}%`;
+    }
 }
 
 function computePacking() {
-    // We need separate packing for "Waiting Room" phase and "Bed" phase
-    // A patient has two bars: Wait Bar and Service Bar.
-    // They usually happen sequentially but in different physical spaces.
-    // To make a nice Gantt, we can group by Resource: "Waiting" lanes and "Treatment" lanes.
+    const MAX_WAIT_LANES = 60;   // physical waiting room seats
+    const MAX_ED_LANES = 50;   // ED bed count
+    const MAX_ICU_LANES = 20;   // ICU bed count
 
     const waitLanes = [];
     const edLanes = [];
     const icuLanes = [];
 
-    // Helper to find a lane
-    function findLane(lanes, start, end) {
+    function findLane(lanes, start, end, maxLanes) {
+        // Try to find a free lane
         for (let i = 0; i < lanes.length; i++) {
             if (lanes[i] <= start) {
                 lanes[i] = end;
                 return i;
             }
         }
-        lanes.push(end);
-        return lanes.length - 1;
+        // Open a new lane if under cap
+        if (lanes.length < maxLanes) {
+            lanes.push(end);
+            return lanes.length - 1;
+        }
+        // At cap — reuse the lane that frees up soonest (overlap accepted)
+        let minIdx = 0;
+        for (let i = 1; i < lanes.length; i++) {
+            if (lanes[i] < lanes[minIdx]) minIdx = i;
+        }
+        lanes[minIdx] = end;
+        return minIdx;
     }
 
     state.renderItems = [];
 
     state.patients.forEach(p => {
-        // 1. Waiting Phase
         if (p.wait_minutes > 0) {
-            const laneIdx = findLane(waitLanes, p.arrival.getTime(), p.serviceStart.getTime());
+            const laneIdx = findLane(waitLanes, p.arrival.getTime(), p.serviceStart.getTime(), MAX_WAIT_LANES);
             state.renderItems.push({
-                type: 'wait',
-                patient: p,
-                lane: laneIdx,
-                group: 'wait',
-                start: p.arrival,
-                end: p.serviceStart,
-                urgency: p.urgency
+                type: 'wait', patient: p, lane: laneIdx, group: 'wait',
+                start: p.arrival, end: p.serviceStart, urgency: p.urgency
             });
         }
 
-        // 2. Service Phase
-        let laneIdx;
-        let group;
+        let laneIdx, group;
         if (p.bed_type === 'ICU') {
-            laneIdx = findLane(icuLanes, p.serviceStart.getTime(), p.discharge.getTime());
+            laneIdx = findLane(icuLanes, p.serviceStart.getTime(), p.discharge.getTime(), MAX_ICU_LANES);
             group = 'icu';
         } else {
-            // Default to ED if not explicitly ICU
-            laneIdx = findLane(edLanes, p.serviceStart.getTime(), p.discharge.getTime());
+            laneIdx = findLane(edLanes, p.serviceStart.getTime(), p.discharge.getTime(), MAX_ED_LANES);
             group = 'ed';
         }
-
         state.renderItems.push({
-            type: 'service',
-            patient: p,
-            lane: laneIdx,
-            group: group,
-            start: p.serviceStart,
-            end: p.discharge,
-            urgency: p.urgency
+            type: 'service', patient: p, lane: laneIdx, group,
+            start: p.serviceStart, end: p.discharge, urgency: p.urgency
         });
     });
 
-    state.waitLaneCount = waitLanes.length;
-    state.edLaneCount = edLanes.length;
-    state.icuLaneCount = icuLanes.length;
-    state.totalLanes = state.waitLaneCount + state.edLaneCount + state.icuLaneCount + 2; // + spacing
+    state.waitLaneCount = Math.min(waitLanes.length, MAX_WAIT_LANES);
+    state.edLaneCount = Math.min(edLanes.length, MAX_ED_LANES);
+    state.icuLaneCount = Math.min(icuLanes.length, MAX_ICU_LANES);
+    state.totalLanes = state.waitLaneCount + state.edLaneCount + state.icuLaneCount + 2;
+
+    // Lane height: use 30px by default; shrink only if still too tall
+    const rawHeight = state.totalLanes * 30 + 100;
+    if (rawHeight > CONFIG.maxCanvasHeight) {
+        CONFIG.laneHeight = Math.max(6, Math.floor((CONFIG.maxCanvasHeight - 100) / state.totalLanes));
+        CONFIG.lanePadding = 1;
+    } else {
+        CONFIG.laneHeight = 30;
+        CONFIG.lanePadding = 4;
+    }
 }
+
 
 // Fix Squashed Text: Remove CSS scaling by setting width/height attributes to match client size
 function handleResize() {
@@ -242,6 +286,22 @@ function setupControls() {
     });
 
     window.addEventListener('mouseup', () => isDragging = false);
+
+    // Mouse wheel + trackpad scroll
+    canvas.addEventListener('wheel', e => {
+        const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+        const isShiftScroll = e.shiftKey && e.deltaY !== 0;
+
+        if (isHorizontal || isShiftScroll) {
+            // Trackpad horizontal swipe OR Shift+wheel → pan timeline left/right
+            e.preventDefault();
+            const delta = isShiftScroll ? e.deltaY : e.deltaX;
+            state.viewOffset += delta * state.zoomLevel;
+            state.viewOffset = Math.max(0, state.viewOffset);
+            draw();
+        }
+        // Pure vertical scroll falls through to the container's native scrollbar
+    }, { passive: false });
 }
 
 function msToPx(ms) {

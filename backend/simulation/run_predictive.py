@@ -35,14 +35,14 @@ def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capac
     
     print(f"Running Predictive Simulation for {len(patients)} patients...")
     print(f"Capacity: ED={ed_capacity}, ICU={icu_capacity}")
-    print(f"Reservation threshold: 70%")
+    print(f"Reservation threshold: > 5.0 Expected Arrivals (Disabled)")
     
     # Run engine
     engine = PredictiveEngine(
         ed_capacity=ed_capacity, 
         icu_capacity=icu_capacity,
         predictor=predictor,
-        reservation_threshold=0.7,
+        reservation_threshold=5.0,  # Disable empty reservations to maximize throughput
         reservation_timeout_minutes=30
     )
     engine.run(patients)

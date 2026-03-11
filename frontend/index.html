@@ -26,14 +26,34 @@
                     <label>Avg LOS</label>
                     <span id="avg-los">0m</span>
                 </div>
+                <div class="stat-item">
+                    <label>ED Occupancy</label>
+                    <span id="ed-occupancy">—</span>
+                </div>
+                <div class="stat-item">
+                    <label>ICU Occupancy</label>
+                    <span id="icu-occupancy">—</span>
+                </div>
             </div>
         </header>
+
+        <!-- Per-level wait time panel -->
+        <div id="level-stats-bar" style="
+            display: flex; gap: 12px; padding: 8px 20px;
+            background: #1e293b; border-bottom: 1px solid #334155;
+            font-size: 0.78rem; flex-wrap: wrap; align-items: center;">
+            <span style="color:#94a3b8; font-weight:600; margin-right:4px;">Avg Wait by Level:</span>
+            <span style="color:#ef4444;">L1 (Critical): <strong id="wait-l1">—</strong></span>
+            <span style="color:#f97316;">L2 (Urgent): <strong id="wait-l2">—</strong></span>
+            <span style="color:#10b981;">L3 (Emergent): <strong id="wait-l3">—</strong></span>
+            <span style="color:#22d3ee;">L4 (Standard): <strong id="wait-l4">—</strong></span>
+            <span style="color:#94a3b8;">L5 (Non-Urgent): <strong id="wait-l5">—</strong></span>
+        </div>
 
         <div class="controls">
             <select id="data-source-select"
                 style="margin-right: 15px; padding: 5px; background: #334155; color: white; border: 1px solid #475569; border-radius: 4px;">
-                <option value="original">Synthetic Data (Raw)</option>
-                <option value="fcfs">FCFS Simulation (Baseline)</option>
+                <option value="fcfs" selected>FCFS Simulation (Baseline)</option>
                 <option value="predictive">AI Predictive Allocation</option>
             </select>
             <button id="zoom-in">+</button>

@@ -1,80 +1,108 @@
-"""Train the high-urgency arrival predictor model."""
+"""Train the expected-arrivals predictor model."""
 
 import pandas as pd
+import numpy as np
 import os
-from datetime import datetime
-from dateutil import parser as dateparser
 from backend.ml.predictor import HighUrgencyPredictor
 
-def prepare_training_data(csv_path):
+def prepare_training_data(csv_path, prediction_window_minutes=60):
     """
-    Prepare training data from patient CSV.
-    
-    For each patient arrival, we need to calculate:
-    - ED/ICU occupancy at time of arrival
-    - Recent arrival rate
+    Prepare regressor training data.
     """
     df = pd.read_csv(csv_path)
     df['arrival_ts'] = pd.to_datetime(df['arrival_ts'])
     df['assessment_start_ts'] = pd.to_datetime(df['assessment_start_ts'])
     df['discharge_ts'] = pd.to_datetime(df['discharge_ts'])
     
-    # Sort by arrival
     df = df.sort_values('arrival_ts').reset_index(drop=True)
     
-    training_records = []
+    features_list = []
+    labels_list = []
     
-    for idx, row in df.iterrows():
-        arrival_time = row['arrival_ts']
-        
-        # Calculate occupancy at this moment
-        # Count patients currently in ED/ICU
-        mask_active = (df['assessment_start_ts'] <= arrival_time) & (df['discharge_ts'] > arrival_time)
-        active_patients = df[mask_active]
-        
-        ed_count = (active_patients['bed_assigned_type'] == 'ED').sum()
-        icu_count = (active_patients['bed_assigned_type'] == 'ICU').sum()
-        
-        ed_occupancy = min(1.0, ed_count / 50.0)  # 50 ED beds
-        icu_occupancy = min(1.0, icu_count / 20.0)  # 20 ICU beds
-        
-        # Calculate recent arrival rate (last 2 hours)
-        lookback_time = arrival_time - pd.Timedelta(hours=2)
-        recent_arrivals = df[(df['arrival_ts'] >= lookback_time) & (df['arrival_ts'] < arrival_time)]
-        recent_rate = len(recent_arrivals) / 2.0  # patients per hour
-        
-        training_records.append({
-            'arrival_ts': arrival_time,
-            'urgency': row['urgency_level'],
-            'ed_occupancy': ed_occupancy,
-            'icu_occupancy': icu_occupancy,
-            'recent_rate': recent_rate
-        })
+    # Convert to lists for fast iteration
+    arrival_times = df['arrival_ts'].tolist()
+    assess_times = df['assessment_start_ts'].tolist()
+    disc_times = df['discharge_ts'].tolist()
+    bed_types = df['bed_assigned_type'].tolist()
+    urgencies = df['urgency_level'].tolist()
     
-    return training_records
+    n = len(df)
+    
+    for i in range(n):
+        current_time = arrival_times[i]
+        
+        # 1. Occupancy & Acuity Density
+        ed_count = 0
+        icu_count = 0
+        acuity_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        
+        # Look backwards to find currently active patients
+        for j in range(i - 1, -1, -1):
+            if (current_time - arrival_times[j]).total_seconds() > 24 * 3600:
+                break # Nobody stays > 24 hours
+            if assess_times[j] <= current_time < disc_times[j]:
+                if bed_types[j] == 'ICU':
+                    icu_count += 1
+                else:
+                    ed_count += 1
+                acuity_counts[urgencies[j]] += 1
+                
+        ed_occupancy = min(1.0, ed_count / 50.0)
+        icu_occupancy = min(1.0, icu_count / 20.0)
+        
+        # 2. Rolling arrival rates
+        rates = {'15m': 0, '30m': 0, '1h': 0, '4h': 0}
+        for j in range(i - 1, -1, -1):
+            delta = (current_time - arrival_times[j]).total_seconds() / 60.0
+            if delta <= 15: rates['15m'] += 1
+            if delta <= 30: rates['30m'] += 1
+            if delta <= 60: rates['1h'] += 1
+            if delta <= 240: rates['4h'] += 1
+            if delta > 240: break
+            
+        # 3. Target Label: Count of L1/L2 in next prediction_window_minutes
+        future_l1_l2_count = 0
+        for j in range(i + 1, n):
+            delta = (arrival_times[j] - current_time).total_seconds() / 60.0
+            if delta > prediction_window_minutes:
+                break
+            if urgencies[j] in (1, 2):
+                future_l1_l2_count += 1
+                
+        hour_sin = np.sin(2 * np.pi * current_time.hour / 24.0)
+        hour_cos = np.cos(2 * np.pi * current_time.hour / 24.0)
+        dow_sin = np.sin(2 * np.pi * current_time.weekday() / 7.0)
+        dow_cos = np.cos(2 * np.pi * current_time.weekday() / 7.0)
+        
+        feat = [
+            hour_sin, hour_cos, dow_sin, dow_cos,
+            ed_occupancy, icu_occupancy,
+            rates['15m'], rates['30m'], rates['1h'], rates['4h'],
+            acuity_counts[1], acuity_counts[2], acuity_counts[3]
+        ]
+        features_list.append(feat)
+        labels_list.append(future_l1_l2_count)
+        
+    return np.array(features_list), np.array(labels_list)
 
 def main():
     print("Loading historical data...")
-    training_data = prepare_training_data('data/patients_2500.csv')
+    prediction_window = 60
+    X, y = prepare_training_data('data/patients_2500.csv', prediction_window)
     
-    print(f"Prepared {len(training_data)} training samples")
+    print(f"Prepared {len(X)} training samples")
+    print(f"Average L1/L2 arrivals per 60m window: {np.mean(y):.2f}")
     
-    print("\nTraining model...")
-    predictor = HighUrgencyPredictor(prediction_window_minutes=30)
-    metrics = predictor.train(training_data)
+    print("\nTraining Regression Model...")
+    predictor = HighUrgencyPredictor(prediction_window_minutes=prediction_window)
+    metrics = predictor.train(X, y)
     
-    print("\n=== Training Results (Multiclass) ===")
-    print(f"Macro Precision: {metrics.get('precision', 0):.3f}")
-    print(f"Macro Recall: {metrics.get('recall', 0):.3f}")
-    print(f"Macro F1-Score: {metrics.get('f1', 0):.3f}")
+    print("\n=== Training Results (Regression) ===")
+    print(f"Mean Absolute Error: {metrics.get('mae', 0):.3f} patients")
+    print(f"Root Mean Squared Error: {np.sqrt(metrics.get('mse', 0)):.3f}")
+    print(f"R2 Target Variance Explained: {metrics.get('r2', 0):.3f}")
     print(f"Training samples: {metrics.get('train_size', 0)}")
     print(f"Test samples: {metrics.get('test_size', 0)}")
-    
-    print("\nTarget Class Distribution:")
-    dist = metrics.get('class_distribution', {})
-    for cls in sorted(dist.keys()):
-        label = "No Arrival" if cls == 0 else f"Level {cls}"
-        print(f"  {label:12}: {dist[cls]:.2%}")
     
     # Save model
     os.makedirs('models', exist_ok=True)
