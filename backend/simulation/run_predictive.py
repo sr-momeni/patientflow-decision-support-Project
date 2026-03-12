@@ -4,7 +4,7 @@ import pandas as pd
 import os
 from dateutil import parser
 from backend.simulation.event_model import SimulationPatient
-from backend.simulation.predictive_engine import PredictiveEngine
+from backend.simulation.predictive_engine import PredictiveEngine, summarize_simulation_metrics
 from backend.ml.predictor import HighUrgencyPredictor
 
 def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capacity=20):
@@ -68,16 +68,21 @@ def run_predictive_simulation(input_path, output_path, ed_capacity=50, icu_capac
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_out.to_csv(output_path, index=False)
     print(f"Saved predictive results to {output_path}")
-    
-    # Print statistics
-    avg_wait = df_out['waiting_time_minutes'].mean()
+
+    metrics = summarize_simulation_metrics(patients, ed_capacity, icu_capacity)
+
     print(f"\n=== Predictive Simulation Results ===")
-    print(f"Average waiting time: {avg_wait:.2f} minutes")
+    print(f"Average waiting time: {metrics['average_waiting_time']:.2f} minutes")
+    print(f"Average LOS: {metrics['average_los']:.2f} minutes")
+    print(f"ED bed utilization: {metrics['ed_bed_utilization']:.2%}")
+    print(f"ICU bed utilization: {metrics['icu_bed_utilization']:.2%}")
     
     for urgency in [1, 2, 3, 4, 5]:
         urgency_df = df_out[df_out['urgency_level'] == urgency]
         avg_urgency_wait = urgency_df['waiting_time_minutes'].mean()
         print(f"Level {urgency} avg wait: {avg_urgency_wait:.2f} minutes")
+
+    return metrics
 
 if __name__ == "__main__":
     run_predictive_simulation('data/patients_2500.csv', 'data/patients_predictive.csv')

@@ -45,38 +45,9 @@ REQUIRED_COLUMNS = [
     "los_minutes",
 ]
 
-# ---------------------------------------------------------------------------
-# Arrival pattern constants
-# ---------------------------------------------------------------------------
+# Backward-compatible alias for older tests/imports.
+OUTPUT_COLUMNS = REQUIRED_COLUMNS
 
-# Relative weight per hour (index = hour 0–23).
-# Values normalised so their mean ≈ 1.0 across the day.
-HOURLY_WEIGHTS: List[float] = [
-    0.40, 0.35, 0.32, 0.30, 0.33, 0.50,   # 00–05
-    0.70, 0.90, 1.20, 1.50, 1.80, 1.90,   # 06–11
-    1.90, 1.85, 1.70, 1.60, 1.50, 1.40,   # 12–17
-    1.30, 1.20, 1.10, 1.00, 0.80, 0.60,   # 18–23
-]
-_HOURLY_TOTAL = sum(HOURLY_WEIGHTS)
-
-# Day-of-week multiplier indexed by weekday(): 0 = Monday … 6 = Sunday
-DOW_MULTIPLIERS: List[float] = [1.10, 0.90, 0.92, 0.92, 1.15, 1.25, 1.10]
-
-# Base daily patient volume — tuned for ~90% avg ED occupancy
-# Formula: 0.90 × 50 beds × 1440 min/day ÷ 176 min avg LOS ≈ 369
-BASE_DAILY_VOLUME = 369
-
-# Realistic CTAS urgency distribution (Canadian national ER data)
-# Default daytime weights: levels 1–5
-CTAS_WEIGHTS_DAY: List[float] = [0.015, 0.12, 0.32, 0.38, 0.165]
-# Nighttime weights (22:00 - 06:00): higher proportion of Level 1/2
-CTAS_WEIGHTS_NIGHT: List[float] = [0.05, 0.25, 0.35, 0.25, 0.10]
-
-
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
 
 @dataclass
 class PatientEvent:
@@ -93,6 +64,11 @@ class PatientEvent:
     discharge_ts: str
     waiting_time_minutes: float
     los_minutes: float
+
+    @property
+    def ctas_level(self) -> int:
+        """Backward-compatible alias for older tests."""
+        return self.urgency_level
 
 
 # ---------------------------------------------------------------------------
@@ -315,9 +291,36 @@ def summarize(events: Sequence[PatientEvent]) -> Dict:
     return summary
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+def generate_patients(
+    n: int,
+    scenario: ScenarioConfig,
+    seed: int = 0,
+    inject_cases: bool = False,
+    **kwargs,
+) -> List[PatientEvent]:
+    """
+    Backward-compatible wrapper for older tests.
+
+    This maps the legacy generator name onto the current event generator
+    without changing the current simulation data model.
+    """
+
+    events = generate_events(
+        n=n,
+        scenario=scenario,
+        seed=seed,
+        start_date=kwargs.get("start_date"),
+    )
+
+    if inject_cases:
+        benchmark_levels = [1, 2, 3, 4, 5]
+        for idx, level in enumerate(benchmark_levels):
+            if idx >= len(events):
+                break
+            events[idx].urgency_level = level
+
+    return events
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(

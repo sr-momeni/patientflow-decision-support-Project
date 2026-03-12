@@ -18,6 +18,41 @@ class Recommendation:
     alerts: List[str]
 
 
+def compute_priority_score(patient: Dict[str, Any], scenario: ScenarioConfig | None = None) -> float:
+    """
+    Compute a sortable priority score without changing the patient schema.
+
+    Score components:
+    - CTAS/urgency base score
+    - accrued waiting time
+    - optional risk modifier when present
+    """
+
+    urgency = int(patient.get("urgency_level", 3))
+    base_score = {
+        1: 100.0,
+        2: 80.0,
+        3: 60.0,
+        4: 40.0,
+        5: 20.0,
+    }.get(urgency, 20.0)
+
+    waiting_time = float(patient.get("waiting_time_minutes", 0.0) or 0.0)
+    waiting_time_weight = 5.0
+    if scenario and scenario.name == "ed_congestion":
+        waiting_time_weight = 2.5
+
+    risk_modifier = patient.get("risk_modifier", 0.0)
+    if isinstance(risk_modifier, bool):
+        risk_modifier = 10.0 if risk_modifier else 0.0
+    elif isinstance(risk_modifier, (int, float)):
+        risk_modifier = float(risk_modifier)
+    else:
+        risk_modifier = 0.0
+
+    return base_score + (waiting_time / waiting_time_weight) + risk_modifier
+
+
 def _baseline_wait(urgency: int) -> float:
     return {1: 15.0, 2: 45.0, 3: 90.0, 4: 120.0, 5: 180.0}.get(urgency, 60.0)
 
@@ -59,14 +94,21 @@ def allocate_resources(
         alerts.append("ICU bottleneck")
 
     recommendations: List[Recommendation] = []
+    prioritized_batch = sorted(
+        patient_batch,
+        key=lambda patient: compute_priority_score(patient, scenario),
+        reverse=True,
+    )
 
-    for p in patient_batch:
+    for p in prioritized_batch:
         pid = str(p.get("patient_id"))
         urgency = int(p.get("urgency_level", 2))
         bed_choice = "ED"
         patient_alerts: List[str] = []
 
-        if urgency == 1 and scenario.icu_beds > 0 and icu_util < 1.1:
+        if scenario.name == "icu_bottleneck" and urgency in (1, 2) and scenario.icu_beds > 0 and icu_util < 1.1:
+            bed_choice = "ICU"
+        elif urgency == 1 and scenario.icu_beds > 0 and icu_util < 1.1:
             bed_choice = "ICU"
         elif urgency == 1 and scenario.icu_beds == 0:
             bed_choice = "ED"
