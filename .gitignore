@@ -179,3 +179,10 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# API Keys & Secrets — never commit these
+openAI_key.txt
+*_key.txt
+*.key
+.env
+secrets.json

@@ -1,0 +1,8 @@
+Metric,Value
+Prediction Accuracy (%),41.92
+Opportunity Cost (Bed-Minutes Wasted),2910.0
+ED Occupancy (Baseline FCFS) %,84.93
+ED Occupancy (Predictive AI) %,84.93
+ICU Occupancy (Baseline FCFS) %,39.99
+ICU Occupancy (Predictive AI) %,39.99
+Wasted Capacity Rate (Predictive) %,0.72

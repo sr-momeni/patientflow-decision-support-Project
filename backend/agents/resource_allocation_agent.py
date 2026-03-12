@@ -54,11 +54,11 @@ def compute_priority_score(patient: Dict[str, Any], scenario: ScenarioConfig | N
 
 
 def _baseline_wait(urgency: int) -> float:
-    return {1: 15.0, 2: 45.0, 3: 90.0}.get(urgency, 60.0)
+    return {1: 15.0, 2: 45.0, 3: 90.0, 4: 120.0, 5: 180.0}.get(urgency, 60.0)
 
 
 def _baseline_los(urgency: int) -> float:
-    return {1: 360.0, 2: 180.0, 3: 90.0}.get(urgency, 120.0)
+    return {1: 360.0, 2: 180.0, 3: 90.0, 4: 60.0, 5: 45.0}.get(urgency, 120.0)
 
 
 def _estimate_lab_imaging_delay(batch: Sequence[Dict[str, Any]], scenario: ScenarioConfig) -> Tuple[float, float]:

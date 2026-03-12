@@ -1,94 +1,63 @@
 """Machine Learning predictor for high-urgency patient arrivals."""
 
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Tuple
 import joblib
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, precision_recall_fscore_support
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 class HighUrgencyPredictor:
-    """Predicts probability of high-urgency patient arriving in next time window."""
+    """Predicts expected count of high-urgency (L1/L2) patients arriving in next time window."""
     
-    def __init__(self, prediction_window_minutes=30):
-        self.model = RandomForestClassifier(
-            n_estimators=100,
+    def __init__(self, prediction_window_minutes=60):
+        # We use HistGradientBoostingRegressor as it supports missing values, is fast,
+        # and works well for tabular data.
+        self.model = HistGradientBoostingRegressor(
+            max_iter=100,
             max_depth=10,
-            random_state=42,
-            class_weight='balanced'  # Handle class imbalance
+            learning_rate=0.1,
+            random_state=42
         )
         self.prediction_window_minutes = prediction_window_minutes
         self.is_trained = False
         
-    def _extract_features(self, timestamp: datetime, current_ed_occupancy: float, 
-                         current_icu_occupancy: float, recent_arrival_rate: float) -> np.ndarray:
-        """Extract features for a given state."""
+    def _extract_features(self, timestamp: datetime, ed_occupancy: float, 
+                         icu_occupancy: float, rates: Dict[str, float],
+                         acuity_counts: Dict[int, int]) -> np.ndarray:
+        """Extract features including cyclical time encoding."""
+        
+        # Cyclical encoding helps the model understand that 23:00 is close to 01:00
+        hour_sin = np.sin(2 * np.pi * timestamp.hour / 24.0)
+        hour_cos = np.cos(2 * np.pi * timestamp.hour / 24.0)
+        dow_sin = np.sin(2 * np.pi * timestamp.weekday() / 7.0)
+        dow_cos = np.cos(2 * np.pi * timestamp.weekday() / 7.0)
+        
         features = [
-            timestamp.hour,  # Hour of day (0-23)
-            timestamp.minute,  # Minute (0-59)
-            timestamp.weekday(),  # Day of week (0=Monday, 6=Sunday)
-            current_ed_occupancy,  # % of ED beds occupied
-            current_icu_occupancy,  # % of ICU beds occupied
-            recent_arrival_rate,  # Patients per hour in last 2 hours
+            hour_sin, hour_cos,
+            dow_sin, dow_cos,
+            ed_occupancy,
+            icu_occupancy,
+            rates.get('15m', 0.0),
+            rates.get('30m', 0.0),
+            rates.get('1h', 0.0),
+            rates.get('4h', 0.0),
+            acuity_counts.get(1, 0),
+            acuity_counts.get(2, 0),
+            acuity_counts.get(3, 0),
         ]
         return np.array(features).reshape(1, -1)
     
-    def train(self, arrivals_data: List[Dict]) -> Dict:
+    def train(self, features_matrix: np.ndarray, labels: np.ndarray) -> Dict:
         """
-        Train the model on historical arrival data.
-        
-        Args:
-            arrivals_data: List of dicts with keys: 
-                - 'arrival_ts': datetime
-                - 'urgency': int
-                - 'ed_occupancy': float
-                - 'icu_occupancy': float
-                - 'recent_rate': float
-        
-        Returns:
-            Dict with training metrics
+        Train the regressor model.
+        features_matrix: Pre-calculated features from historical data.
+        labels: Actual count of L1/L2 arrivals in the target window.
         """
-        X = []
-        y = []
-        
-        for i, record in enumerate(arrivals_data):
-            # Features
-            ts = record['arrival_ts']
-            features = [
-                ts.hour,
-                ts.minute,
-                ts.weekday(),
-                record.get('ed_occupancy', 0.5),
-                record.get('icu_occupancy', 0.5),
-                record.get('recent_rate', 10.0),
-            ]
-            X.append(features)
-            
-            # Label: Was there a high-urgency arrival in next window?
-            # We need to look ahead in the data
-            future_window_end = ts + timedelta(minutes=self.prediction_window_minutes)
-            has_urgent = False
-            
-            for j in range(i, min(i + 50, len(arrivals_data))):  # Look ahead
-                next_arrival = arrivals_data[j]
-                next_ts = next_arrival['arrival_ts']
-                
-                if next_ts > future_window_end:
-                    break
-                    
-                if next_arrival['urgency'] == 1:  # Urgency level 1
-                    has_urgent = True
-                    break
-                    
-            y.append(1 if has_urgent else 0)
-        
-        X = np.array(X)
-        y = np.array(y)
-        
         # Train/test split
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
+            features_matrix, labels, test_size=0.2, random_state=42
         )
         
         # Train
@@ -97,33 +66,36 @@ class HighUrgencyPredictor:
         
         # Evaluate
         y_pred = self.model.predict(X_test)
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            y_test, y_pred, average='binary'
-        )
+        
+        mse = mean_squared_error(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
         
         return {
-            'precision': precision,
-            'recall': recall,
-            'f1': f1,
+            'mse': mse,
+            'mae': mae,
+            'r2': r2,
             'train_size': len(X_train),
             'test_size': len(X_test),
-            'positive_class_ratio': y.mean()
         }
     
     def predict(self, timestamp: datetime, ed_occupancy: float, 
-                icu_occupancy: float, recent_rate: float) -> float:
+                icu_occupancy: float, rates: Dict[str, float],
+                acuity_counts: Dict[int, int]) -> float:
         """
-        Predict probability of high-urgency arrival in next window.
+        Predict expected count of high-urgency arrivals in next window.
         
         Returns:
-            Probability between 0 and 1
+            float: Expected number of L1/L2 patients.
         """
         if not self.is_trained:
             raise ValueError("Model must be trained before prediction")
             
-        features = self._extract_features(timestamp, ed_occupancy, icu_occupancy, recent_rate)
-        proba = self.model.predict_proba(features)[0, 1]  # Probability of class 1
-        return proba
+        features = self._extract_features(timestamp, ed_occupancy, icu_occupancy, rates, acuity_counts)
+        expected_count = self.model.predict(features)[0]
+        
+        # Count can't be negative
+        return max(0.0, float(expected_count))
     
     def save(self, path: str):
         """Save trained model to disk."""

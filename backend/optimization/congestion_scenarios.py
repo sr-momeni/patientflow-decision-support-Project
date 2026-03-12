@@ -82,6 +82,22 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         ed_util_alert=0.9,
         icu_util_alert=0.9,
     )
+    
+    severe_congestion = ScenarioConfig(
+        name="severe_congestion",
+        description="Severe congestion with very high arrivals vs capacity.",
+        ed_beds=20,
+        icu_beds=5,
+        physicians=6,
+        nurses=14,
+        lab_slots_per_hour=15,
+        imaging_slots_per_hour=10,
+        arrival_rates_per_hour={1: 3.0, 2: 15.0, 3: 25.0, 4: 20.0, 5: 15.0},
+        senior_staff_available=True,
+        ed_near_full_threshold=0.95,
+        ed_util_alert=0.95,
+        icu_util_alert=0.95,
+    )
 
     icu_bottleneck = ScenarioConfig(
         name="icu_bottleneck",
@@ -105,7 +121,26 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
         icu_util_alert=0.9,
     )
 
-    return {cfg.name: cfg for cfg in (normal, ed_congestion, icu_bottleneck)}
+    critical_burst = ScenarioConfig(
+        name="critical_burst",
+        description="Surge in Level 1 and Level 2 critical arrivals.",
+        ed_beds=50,
+        icu_beds=20,
+        physicians=8,
+        nurses=22,
+        lab_slots_per_hour=22,
+        imaging_slots_per_hour=14,
+        arrival_rates_per_hour={1: 10.0, 2: 20.0, 3: 12.0, 4: 10.0, 5: 6.0},
+        senior_staff_available=True,
+        ed_near_full_threshold=0.85,
+        ed_util_alert=0.9,
+        icu_util_alert=0.9,
+    )
+
+    return {cfg.name: cfg for cfg in (
+        normal, moderate_congestion, ed_congestion, 
+        severe_congestion, icu_bottleneck, critical_burst
+    )}
 
 
 _SCENARIOS = _build_scenarios()
@@ -130,10 +165,8 @@ def validate_scenario(cfg: ScenarioConfig) -> None:
 
     if not (cfg.ed_beds > 0 and cfg.icu_beds >= 0):
         raise ValueError("ed_beds must be > 0 and icu_beds must be >= 0")
-
     if cfg.physicians <= 0 or cfg.nurses <= 0:
         raise ValueError("physicians and nurses must be > 0")
-
     if cfg.lab_slots_per_hour <= 0 or cfg.imaging_slots_per_hour <= 0:
         raise ValueError("lab_slots_per_hour and imaging_slots_per_hour must be > 0")
 
@@ -141,9 +174,7 @@ def validate_scenario(cfg: ScenarioConfig) -> None:
         rate = cfg.arrival_rates_per_hour.get(lvl, 0.0)
         if rate < 0:
             raise ValueError(f"arrival rate for CTAS{lvl} must be >= 0")
-
     if not (0 < cfg.ed_util_alert <= 1.0):
         raise ValueError("ed_util_alert must be in (0, 1]")
-
     if not (0 < cfg.icu_util_alert <= 1.0):
         raise ValueError("icu_util_alert must be in (0, 1]")

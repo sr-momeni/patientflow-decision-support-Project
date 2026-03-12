@@ -7,6 +7,8 @@
     --urgency-1: #ef4444;
     --urgency-2: #f97316;
     --urgency-3: #10b981;
+    --urgency-4: #22d3ee;
+    --urgency-5: #94a3b8;
     --wait-color: #475569;
 }
 
@@ -169,6 +171,14 @@ canvas {
 
 .u3 {
     background: var(--urgency-3);
+}
+
+.u4 {
+    background: var(--urgency-4);
+}
+
+.u5 {
+    background: var(--urgency-5);
 }
 
 .bar-sample {
