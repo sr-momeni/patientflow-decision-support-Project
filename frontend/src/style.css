@@ -1,0 +1,354 @@
+:root {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --urgency-1: #ef4444;
+    --urgency-2: #f97316;
+    --urgency-3: #10b981;
+    --urgency-4: #22d3ee;
+    --urgency-5: #94a3b8;
+    --wait-color: #475569;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 20px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #334155;
+}
+
+h1 {
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+.stats-bar {
+    display: flex;
+    gap: 2rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.stat-item label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-item span {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+button {
+    background: var(--card-bg);
+    border: 1px solid #334155;
+    color: var(--text-primary);
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover {
+    background: #334155;
+}
+
+#timeline-container {
+    flex: 1;
+    background: var(--card-bg);
+    border-radius: 12px;
+    position: relative;
+    overflow: auto;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    min-width: 200px;
+}
+
+.tooltip.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.tooltip-label {
+    color: var(--text-secondary);
+}
+
+/* Legend */
+.legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.u1 {
+    background: var(--urgency-1);
+}
+
+.u2 {
+    background: var(--urgency-2);
+}
+
+.u3 {
+    background: var(--urgency-3);
+}
+
+.u4 {
+    background: var(--urgency-4);
+}
+
+.u5 {
+    background: var(--urgency-5);
+}
+
+.bar-sample {
+    width: 20px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.bar-sample.wait {
+    background: var(--wait-color);
+    opacity: 0.5;
+    border: 1px dashed white;
+}
+
+.bar-sample.service {
+    background: var(--text-secondary);
+}
+
+/* Triage Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    width: 95%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #f8fafc;
+}
+
+#close-triage-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 24px;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 20px;
+    border-top: 1px solid #334155;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.triage-progress {
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #3b82f6;
+    width: 25%;
+    transition: width 0.3s ease;
+}
+
+.triage-step h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.1rem;
+    color: #94a3b8;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.875rem;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: white;
+    font-family: inherit;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #cbd5e1;
+}
+
+.btn-primary {
+    background: #2563eb !important;
+    color: white !important;
+}
+
+.btn-secondary {
+    background: #475569 !important;
+    color: white !important;
+}
+
+.btn-success {
+    background: #16a34a !important;
+    color: white !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.text-muted {
+    color: #64748b;
+    font-size: 0.875rem;
+    font-style: italic;
+}

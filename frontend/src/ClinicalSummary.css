@@ -1,0 +1,276 @@
+/* Main Page Wrapper */
+.summary-page {
+    background-color: #f0f4f8; /* Soft blue-gray background */
+    min-height: 100vh;
+    padding: 40px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* The Main Container Card */
+.summary-card {
+    background: white;
+    width: 100%;
+    max-width: 1100px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    padding-bottom: 0;
+    overflow: hidden;
+}
+
+/* Header Section */
+.header-cube {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.brand h2 {
+    color: #2d3748;
+    font-size: 22px;
+    margin: 0;
+}
+
+/* Section Titles */
+.section-container h3 {
+    padding: 20px 40px 10px 60px; /* Aligned with the shifted cubes */
+    color: #4a5568;
+    font-size: 18px;
+}
+
+/* Patient Info Grid - Shifted Right */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    padding: 0 30px 20px 80px; /* Increased left padding (80px) to shift right */
+}
+
+.data-cube {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    padding: 20px 20px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.data-cube .label {
+    color: black;
+    font-size: 15px;
+    text-transform: none;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.data-cube .value {
+    color: #2d3748;
+    font-weight: 700;
+    margin-top: 4px;
+    font-size: 16px;
+}
+
+.data-cube.highlight {
+    background: #f8fafc;
+}
+
+/* Triage Assessment Layout */
+.result-layout {
+    display: flex;
+    gap: 10px;
+    padding: 0 20px 20px 70px; /* Aligned with patient info shift */
+    align-items: flex-start;
+}
+
+/* Status Cube (Urgency Box) */
+.status-cube {
+    flex: 2; /* Takes more horizontal space */
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    border-left: 5px solid #e53e3e; /* Red accent for HIGH urgency */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+}
+
+.status-icon {
+    font-size: 30px;
+    margin-right: 5px;
+}
+
+.status-text h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #1a202c;
+}
+
+.status-text p {
+    margin: 0;
+    color: #718096;
+}
+
+/* Recommendation/Risk Column - Smaller Length/Width */
+.action-column {
+    flex: 1; /* Constrains column width */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.action-cube {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #4a5568;
+    text-align: center;
+    width: 220px; /* Constrained width for compact look */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+/* This container prevents the box from stretching */
+.notes-wrapper {
+    display: flex;
+    justify-content: flex-start; /* Aligns the box to the left */
+    padding-bottom: 20px;       /* Keeps it away from the bottom card border */
+}
+
+.notes-box {
+    /* Adjust this percentage or pixel value to your liking */
+    max-width: 200px; 
+    width: 60%;
+    
+    /* Ensuring internal spacing */
+    padding: 20px;
+    min-height: 80px;
+    border-left: 5px;
+    /* Matches the look of your other cubes */
+    display: block; 
+    text-align: left;
+}
+
+.notes-box p {
+    margin: 20;
+    line-height: 1.5;
+    word-wrap: break-word; /* Ensures long text doesn't break the box */
+}
+/* AI Footer Section */
+.ai-footer {
+    background: #1a202c;
+    color: white;
+    padding: 25px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ai-label {
+    font-size: 14px;
+    color: #a0aec0;
+}
+
+.ai-value {
+    margin: 0;
+    font-size: 28px;
+}
+
+.ai-visual {
+    display: flex;
+    gap: 5px;
+}
+
+.bar {
+    width: 20px;
+    height: 8px;
+    background: #4a5568;
+    border-radius: 2px;
+}
+
+.bar.fill {
+    background: #edf2f7;
+}
+
+/* Navigation Button */
+.nav-back-btn {
+    margin-top: 25px;
+    background: #2b3674;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.nav-back-btn:hover {
+    background: #1a202c;
+}
+
+
+
+
+
+
+/* Styling for Row 2 specific highlights */
+.highlight-blue {
+    border-color: #3182ce;
+    background: #ebf8ff;
+}
+
+.pain-text {
+    color: #e53e3e; /* Red text for the pain scale */
+    font-size: 24px;
+    font-weight: 800;
+}
+
+/* Wide card for long text like History/Allergies */
+.wide-info-card {
+    display: flex;
+    gap: 20px;
+    padding: 0 40px 30px 80px; /* Aligned with upper cubes */
+}
+
+.history-block {
+    flex: 1;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    border-radius: 15px;
+}
+
+/* First Row: 4 Columns */
+.info-grid-row-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* Exactly 4 cubes */
+    gap: 20px;
+    padding: 0 30px 20px 80px; /* Shifted toward the right */
+    
+}
+
+/* Second Row: 3 Columns */
+.info-grid-row-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* Exactly 3 cubes */
+    gap: 20px;
+    padding: 0 30px 20px 80px; /* Extra right padding (200px) keeps them aligned to the left side of the row above */
+   
+}
+
+/* Individual Large Cubes */
+.data-cube-large {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 3px 20px; /* Increased breadth/height */
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}

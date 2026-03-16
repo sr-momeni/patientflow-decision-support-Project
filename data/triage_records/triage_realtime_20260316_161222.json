@@ -1,0 +1,10 @@
+{
+  "primary_complaint": "fell and left arm pain",
+  "pain_score": 9,
+  "consciousness": "alert",
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "age": 22,
+  "summary": "The patient fell from the stairs and has sudden severe left arm pain, is alert, and does not report breathing issues or other concerning symptoms."
+}

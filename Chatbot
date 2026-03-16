@@ -1,0 +1,133 @@
+#import libraries
+import bs4 as bs
+import urllib.request
+import re
+import ssl
+import nltk
+import numpy as np
+import random
+import string
+
+# FIX: Properly set up NLTK in Colab
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+# Download all required NLTK data
+nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('wordnet', quiet=True)
+nltk.download('averaged_perceptron_tagger', quiet=True)  # Often helpful
+
+# Scrape website and preprocess data
+def scrape_wikipedia(url):
+    req = urllib.request.Request(
+        url, 
+        data=None, 
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+    )
+    
+    try:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        
+        with urllib.request.urlopen(req, context=context) as response:
+            raw_data = response.read()
+        
+        html_data = bs.BeautifulSoup(raw_data, 'lxml')
+        all_paragraphs = html_data.find_all('p')
+        
+        article_content = ""
+        for p in all_paragraphs:
+            article_content += p.text
+        
+        return article_content
+        
+    except Exception as e:
+        print(f"Error scraping: {e}")
+        return None
+
+# Main execution
+url = 'https://en.wikipedia.org/wiki/Global_warming'
+article_content = scrape_wikipedia(url)
+
+if article_content:
+    # Process the content
+    article_content = article_content.lower()
+    article_content = re.sub(r'\[[0-9]*\]', ' ', article_content)
+    article_content = re.sub(r'\s+', ' ', article_content)
+    
+    # This will now work with the downloaded punkt_tab
+    sentence_list = nltk.sent_tokenize(article_content)
+    article_words = nltk.word_tokenize(article_content)
+    
+    print(f"Success! Found {len(sentence_list)} sentences and {len(article_words)} words.")
+    print("\nPreview:")
+    print(article_content[:500] + "...")
+
+lemmatizer = nltk.stem.WordNetLemmatizer()
+
+def LemmatizeWords(words):
+    return [lemmatizer.lemmatize(word) for word in words]
+
+remove_punctuation= dict((ord(punctuation), None) for punctuation in string.punctuation)
+
+def RemovePunctuations(text):
+    return LemmatizeWords(nltk.word_tokenize(text.lower().translate(remove_punctuation)))
+#add greetings
+greeting_input_texts = ("hi","hey", "heys", "hello", "morning", "evening","greetings",)
+greeting_replie_texts = ["hey", "hey hows you?", "*nods*", "hello there", "ello", "Welcome, how are you"]
+
+def reply_greeting(text):
+
+    for word in text.split():
+        if word.lower() in greeting_input_texts:
+            return random.choice(greeting_replie_texts)
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+#Approach for general response generation
+
+def give_reply(user_input):
+    chatbot_response=''
+    sentence_list.append(user_input)
+    word_vectors = TfidfVectorizer(tokenizer=RemovePunctuations, stop_words='english')
+    vectorized_words = word_vectors.fit_transform(sentence_list)
+    similarity_values = cosine_similarity(vectorized_words[-1], vectorized_words)
+    similar_sentence_number =similarity_values.argsort()[0][-2]
+    similar_vectors = similarity_values.flatten()
+    similar_vectors.sort()
+    matched_vector = similar_vectors[-2]
+    if(matched_vector ==0):
+        chatbot_response=chatbot_response+"I am sorry! I don't understand you"
+        return chatbot_response
+    else:
+        chatbot_response = chatbot_response +sentence_list[similar_sentence_number]
+        return chatbot_response
+
+#handle user interaction
+continue_discussion=True
+print("Hello, I am a chatbot, I will answer your queries regarding global warming:")
+while(continue_discussion==True):
+    user_input = input()
+    user_input = user_input .lower()
+    if(user_input !='bye'):
+        if(user_input =='thanks' or user_input =='thank you very much'  or user_input =='thank you'):
+            continue_discussion=False
+            print("Chatbot: Most welcome")
+        else:
+            if(reply_greeting(user_input)!=None):
+                print("Chatbot: "+reply_greeting(user_input))
+            else:
+                print("Chatbot: ",end="")
+                print(give_reply(user_input))
+                sentence_list.remove(user_input)
+    else:
+        continue_discussion=False
+        print("Chatbot: Take care, bye ..")
