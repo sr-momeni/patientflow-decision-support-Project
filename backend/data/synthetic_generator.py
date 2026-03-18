@@ -148,6 +148,10 @@ def _choose_disposition(level: int, bed_type: str) -> str:
         return "admit" if roll < 0.55 else "discharge"
     if level == 3:
         return "discharge" if roll < 0.80 else "admit"
+    if level == 4:
+        return "discharge" if roll < 0.92 else "admit"
+    if level == 5:
+        return "discharge" if roll < 0.98 else "admit"
     return "discharge"
 
 

@@ -113,9 +113,9 @@ def allocate_resources(
         elif urgency == 1 and scenario.icu_beds == 0:
             bed_choice = "ED"
             patient_alerts.append("ICU-waiting")
-        elif urgency == 3 and ed_util >= scenario.ed_near_full_threshold:
+        elif urgency in (3, 4, 5) and ed_util >= scenario.ed_near_full_threshold:
             bed_choice = "waiting"
-            patient_alerts.append("Deprioritized Level 3 due to ED crowding")
+            patient_alerts.append(f"Deprioritized Level {urgency} due to ED crowding")
 
         base_wait = _baseline_wait(urgency)
         congestion_factor = 1.0 + max(ed_util - 1.0, 0) + (0.5 if bed_choice == "waiting" else 0.0)

@@ -138,7 +138,7 @@ def _build_scenarios() -> Dict[str, ScenarioConfig]:
     )
 
     return {cfg.name: cfg for cfg in (
-        normal, moderate_congestion, ed_congestion, 
+        normal, ed_congestion,
         severe_congestion, icu_bottleneck, critical_burst
     )}
 
