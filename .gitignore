@@ -186,3 +186,26 @@ openAI_key.txt
 *.key
 .env
 secrets.json
+
+# --- Redundant & Legacy Files (Ignored to keep the repo clean) ---
+# Legacy Backend & Scripts
+/backend/legacy_v1/
+/Chatbot
+/README0.md
+
+# Obsolete Frontend Triage Components & Mock Data
+/frontend/src/public/
+/frontend/src/index.html
+/frontend/src/script.js
+/frontend/src/style.css
+/frontend/src/TriageForm.js
+/frontend/src/TriageForm2.js
+/frontend/src/TriageForm3.js
+/frontend/src/ClinicalSummary.js
+/frontend/src/ClinicalSummary.css
+/frontend/src/data.js
+/frontend/src/data.json
+/frontend/src/data_fcfs.js
+/frontend/src/data_original.js
+/frontend/src/data_predictive.js
+/frontend/src/node_modules/

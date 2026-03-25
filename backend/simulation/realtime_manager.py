@@ -122,9 +122,13 @@ class RealTimeSimulationManager:
             acuities
         )
         
-        # Reserve if expected >= 0.8
-        ed_reserved = 1 if expected >= 0.8 else 0
-        icu_reserved = 1 if expected >= 0.9 else 0
+        # Reserve a bed for expected high-urgency arrivals ONLY IF the department is nearing capacity (>75% full).
+        # There is no need to 'reserve' a bed if the ED is mostly empty.
+        ed_utilization = ed_count / self.ed_capacity
+        icu_utilization = icu_count / max(1, self.icu_capacity)
+        
+        ed_reserved = 1 if (expected >= 0.8 and ed_utilization > 0.75) else 0
+        icu_reserved = 1 if (expected >= 0.9 and icu_utilization > 0.75) else 0
         
         return {
             "active_patients": self.active_patients,

@@ -12,9 +12,15 @@ const DashboardPage = () => {
         const fetchHistory = async () => {
             try {
                 const response = await axios.get('http://localhost:8000/patient-history');
-                setHistory(response.data);
+                if (Array.isArray(response.data)) {
+                    setHistory(response.data);
+                } else {
+                    console.error("Invalid history data received:", response.data);
+                    setHistory([]);
+                }
             } catch (error) {
                 console.error("Error fetching history:", error);
+                setHistory([]);
             }
         };
         fetchHistory();
@@ -57,6 +63,12 @@ const DashboardPage = () => {
                         onClick={() => navigate('/new-patient')}
                     >
                         <span style={{marginRight: '12px'}}>➕</span> Add New Patient
+                    </div>
+                    <div 
+                        className="nav-item" 
+                        onClick={() => navigate('/bed-assignments')}
+                    >
+                        <span style={{marginRight: '12px'}}>🛏️</span> Bed Assignments
                     </div>
                 </div>
 
