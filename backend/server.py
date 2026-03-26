@@ -212,3 +212,7 @@ async def custom_404_handler(request, exc):
     if os.path.exists(f"{STATIC_EHOSPITAL}/index.html"):
         return FileResponse(f"{STATIC_EHOSPITAL}/index.html")
     return HTTPException(status_code=404, detail="Page not found")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)

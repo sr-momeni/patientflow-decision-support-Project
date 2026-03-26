@@ -11,6 +11,8 @@ import io
 import os
 import sys
 import tempfile
+import json
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -38,31 +40,34 @@ _scorer = UrgencyScoringAgent()
 # ---------------------------------------------------------------------------
 
 REALTIME_SYSTEM_PROMPT = """You are an experienced emergency department triage nurse conducting an initial patient assessment via voice.
+The patient is physically present in the Emergency Department (ER) and is currently at the triage desk talking to you.
 
 Your job is to gather enough clinical information to determine the patient's urgency level using the CTAS (Canadian Triage and Acuity Scale), then call the complete_triage function.
+
+CRITICAL RULE — CONTEXT AWARENESS:
+Before asking any question, reason about what the patient has ALREADY told you. If information is clearly implied by their statement, do NOT ask about it.
+Examples:
+- Patient says "I broke my arm" → onset is OBVIOUSLY sudden/traumatic. Do NOT ask "was it sudden or gradual?". Instead ask about pain level, visible deformity, or numbness/tingling.
+- Patient says "I've had chest pain for 3 days" → onset is already known. Do NOT ask when it started.
+- Patient says "I was in a car accident" → mechanism is known. Focus on where they are hurt, any loss of consciousness, or bleeding.
 
 RULES:
 1. Ask ONE question at a time. Never combine questions.
 2. Start by asking what brought them to the ER today.
-3. Collect these details through natural conversation:
-   - Chief complaint / main symptom
-   - Pain level (0 to 10)
-   - When it started (sudden or gradual)
-   - Level of consciousness (are they alert, confused, barely responding)
-   - Breathing difficulty
-   - Any heart racing, very low blood pressure, fainting
-   - Fever or signs of infection
-   - Any active seizure or uncontrolled bleeding
-   - Age
-   - Relevant medical history (chronic disease, pregnancy, weakened immune system, prior stroke)
-4. Ask follow-up questions when something sounds serious or unclear.
+3. ONLY ask for information that has NOT already been provided or clearly implied. Adapt your questions to the specific complaint:
+   - TRAUMA (fracture, fall, accident, wound): Ask about pain level (0-10), location, visible deformity, bleeding, sensation/movement ability.
+   - CHEST/CARDIAC: Ask about pain severity, radiation (arm/jaw), shortness of breath, palpitations, sweating.
+   - RESPIRATORY: Ask about breathing difficulty severity, fever, cough, oxygen issues.
+   - GENERAL/MEDICAL: Ask about onset, pain level, associated symptoms, fever, relevant history.
+4. Always collect: pain level (0-10), age, level of consciousness.
 5. Speak in plain, calm, empathetic language. This is a voice call — no lists, no bullet points.
 6. Do NOT diagnose. Only collect information.
 
-WHEN YOU HAVE ENOUGH INFORMATION (minimum: chief complaint, pain level, consciousness, and 2 or 3 supporting details):
+WHEN YOU HAVE ENOUGH INFORMATION (minimum: chief complaint, pain level, consciousness, and 2 or 3 supporting details relevant to the complaint):
 - Say something like: "Thank you. I now have enough information to calculate your urgency level."
 - Then immediately call the complete_triage function with your best clinical estimates for all required fields.
 - Use safe defaults for any values the patient could not provide (e.g. spo2=98.0, heart_rate=80).
+- For trauma cases: active_seizure=false, uncontrollable_hemorrhage depends on whether the patient described uncontrolled bleeding.
 """
 
 COMPLETE_TRIAGE_TOOL = {
@@ -139,6 +144,24 @@ async def serve_chatbot_ui():
     return FileResponse(_UI_FILE)
 
 
+@router.get("/hospital-state")
+async def get_hospital_state():
+    """Return current ED and ICU bed occupancy for the Bed Assignments page."""
+    try:
+        state = _agent.sim_manager.get_current_state()
+        sim = _agent.sim_manager
+        return {
+            "ed_beds_total":    sim.ed_capacity,
+            "ed_beds_occupied": state["ed_occupied"],
+            "ed_beds_reserved": state["ed_reserved"],
+            "icu_beds_total":   sim.icu_capacity,
+            "icu_beds_occupied": state["icu_occupied"],
+            "icu_beds_reserved": state["icu_reserved"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not fetch hospital state: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Routes — OpenAI Realtime API (WebRTC)
 # ---------------------------------------------------------------------------
@@ -183,9 +206,26 @@ async def score_triage(body: ScoreRequest):
     """
     try:
         data = body.clinical_data
+
+        # Save the clinical data to a JSON file
+        try:
+            records_dir = os.path.join(ROOT_DIR, "data", "triage_records")
+            os.makedirs(records_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"triage_realtime_{timestamp}.json"
+            file_path = os.path.join(records_dir, filename)
+            with open(file_path, "w") as f:
+                json.dump(data, f, indent=2)
+            print(f"DEBUG: Saved realtime assessment to {file_path}")
+        except Exception as e:
+            print(f"WARNING: Could not save realtime assessment JSON: {e}")
+
         ctas_level = _scorer.calculate_urgency(data)
         name, description = CTAS_DESCRIPTIONS.get(ctas_level, ("Unknown", ""))
         color = CTAS_COLORS.get(ctas_level, "#7f8c8d")
+        # Run the real-time simulation allocation
+        sim_result = _agent.sim_manager.process_new_patient(ctas_level)
+        
         return {
             "ctas_level":        ctas_level,
             "ctas_name":         name,
@@ -193,6 +233,9 @@ async def score_triage(body: ScoreRequest):
             "color":             color,
             "summary":           data.get("summary", "Assessment complete."),
             "clinical_data":     data,
+            "recommendation":    sim_result["recommended_bed"],
+            "recommendation_explanation": sim_result["explanation"],
+            "hospital_state":    sim_result["hospital_state"]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scoring error: {str(e)}")

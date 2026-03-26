@@ -30,7 +30,7 @@ const NewPatient = () => {
             if (response.status === 200) {
                 localStorage.setItem('currentPatientId', patientInfo.p_id);
                 alert("Patient Information Saved Successfully!");
-                navigate('/triage-form/');
+                window.location.href = 'http://localhost:8000/chatbot/ui';
                 setPatientInfo({ name: '', p_id:'', health_card: '', notes: '' });
             }
         } catch (error) {
@@ -68,6 +68,12 @@ const NewPatient = () => {
                              <span style={{ color: 'white' }}>➕</span>
                         </div>
                         <span style={{ fontWeight: '700' }}>Add New Patient</span>
+                    </div>
+                    <div 
+                        className="nav-item" 
+                        onClick={() => navigate('/bed-assignments')}
+                    >
+                        <span style={{marginRight: '12px'}}>🛏️</span> Bed Assignments
                     </div>
                 </div>
 

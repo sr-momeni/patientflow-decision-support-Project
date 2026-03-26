@@ -1,0 +1,10 @@
+{
+  "primary_complaint": "broken arm",
+  "pain_score": 7,
+  "consciousness": "alert",
+  "age": 28,
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "resp_distress": "none",
+  "summary": "Patient with a broken arm, pain level 7, unable to move fingers or hand, no visible deformity, alert and 28 years old."
+}

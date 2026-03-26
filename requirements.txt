@@ -7,3 +7,6 @@ pymysql
 pydantic
 openai
 python-multipart
+httpx
+joblib
+scikit-learn

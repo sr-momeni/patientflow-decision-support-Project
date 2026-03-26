@@ -7,16 +7,19 @@ and hands off to UrgencyScoringAgent when ready.
 import json
 import os
 import sys
+from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
 from openai import OpenAI
 
 # Allow importing UrgencyScoringAgent from the agents sibling package
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(BACKEND_DIR)
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 from agents.urgency_scoring_agent import UrgencyScoringAgent
+from simulation.realtime_manager import RealTimeSimulationManager
 
 # ---------------------------------------------------------------------------
 # Load API Key
@@ -30,12 +33,14 @@ client = OpenAI(api_key=_API_KEY)
 # ---------------------------------------------------------------------------
 # SYSTEM PROMPT
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = """You are an experienced emergency department triage nurse conducting an initial patient assessment.
+SYSTEM_PROMPT = """You are an experienced emergency department triage nurse conducting an initial patient assessment. 
+The patient is physically present in the Emergency Department (ER) and is currently at the triage desk talking to you.
+
 Your job is to gather enough clinical information through a calm, professional conversation to determine the patient's urgency level using the CTAS (Canadian Triage and Acuity Scale).
 
 IMPORTANT RULES:
 1. Ask ONE question at a time. Never ask multiple questions in the same message.
-2. Start by asking the patient's chief complaint (main reason for visiting the ER).
+2. Start by asking the patient's chief complaint (main reason for visiting the ER today).
 3. Based on their answers, ask follow-up questions to collect the following information:
    - Chief complaint / primary symptom
    - Pain score (0–10)
@@ -94,6 +99,7 @@ class TriageChatbotAgent:
 
     def __init__(self):
         self.scorer = UrgencyScoringAgent()
+        self.sim_manager = RealTimeSimulationManager()
 
     def chat(
         self, user_message: str, history: List[Dict[str, str]]
@@ -141,6 +147,19 @@ class TriageChatbotAgent:
             # Fallback — return partial message as plain text
             return raw_reply.replace("[TRIAGE_COMPLETE]", "").strip(), None
 
+        # Save the clinical data to a JSON file
+        try:
+            records_dir = os.path.join(ROOT_DIR, "data", "triage_records")
+            os.makedirs(records_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"triage_{timestamp}.json"
+            file_path = os.path.join(records_dir, filename)
+            with open(file_path, "w") as f:
+                json.dump(clinical_data, f, indent=2)
+            print(f"DEBUG: Saved assessment to {file_path}")
+        except Exception as e:
+            print(f"WARNING: Could not save assessment JSON: {e}")
+
         # Run the urgency scorer
         ctas_level = self.scorer.calculate_urgency(clinical_data)
         name, description = CTAS_DESCRIPTIONS.get(ctas_level, ("Unknown", ""))
@@ -152,6 +171,9 @@ class TriageChatbotAgent:
             f"Please see your result below."
         )
 
+        # Run the real-time simulation allocation
+        sim_result = self.sim_manager.process_new_patient(ctas_level)
+        
         result = {
             "ctas_level": ctas_level,
             "ctas_name": name,
@@ -159,6 +181,9 @@ class TriageChatbotAgent:
             "color": color,
             "summary": summary,
             "clinical_data": clinical_data,
+            "recommendation": sim_result["recommended_bed"],
+            "recommendation_explanation": sim_result["explanation"],
+            "hospital_state": sim_result["hospital_state"]
         }
 
         return reply_text, result

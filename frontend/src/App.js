@@ -8,9 +8,8 @@ import SignUp from './SignUp';
 import Dashboard from './Dashboard'; 
 import Newpatient from "./Newpatient";
 import TriageForm from './TriageForm';
-import TriageForm2 from './TriageForm2';
-import TriageForm3 from './TriageForm3';
 import ClinicalSummary from "./ClinicalSummary";
+import BedAssignments from './BedAssignments';
 
 // 1. This is your Landing Page component
 const LandingPage = () => (
@@ -49,9 +48,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-patient" element={<Newpatient />} />
         <Route path="/triage-form" element={<TriageForm />} />
-        <Route path="/triage-form-2" element={<TriageForm2 />} />
-        <Route path="/triage-form-3" element={<TriageForm3 />} />
         <Route path="/clinical/:p_id" element={<ClinicalSummary />} />
+        <Route path="/bed-assignments" element={<BedAssignments />} />
       </Routes>
     </Router>
   );

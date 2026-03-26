@@ -72,6 +72,34 @@ class PatientEvent:
 
 
 # ---------------------------------------------------------------------------
+# Arrival Pattern Constants
+# ---------------------------------------------------------------------------
+
+# Diurnal pattern (relative weights for each of the 24 hours, starting at 00:00)
+# peak 10:00-14:00, trough 03:00-05:00
+HOURLY_WEIGHTS = [
+    0.4, 0.3, 0.2, 0.15, 0.15, 0.2,  # 00:00 - 05:00 (trough)
+    0.4, 0.7, 1.0, 1.3, 1.5, 1.6,  # 06:00 - 11:00 (building to peak)
+    1.6, 1.5, 1.4, 1.3, 1.2, 1.1,  # 12:00 - 17:00 (peak/afternoon)
+    1.0, 0.9, 0.8, 0.7, 0.6, 0.5   # 18:00 - 23:00 (tapering off)
+]
+_HOURLY_TOTAL = sum(HOURLY_WEIGHTS)
+
+# Day-of-week multipliers (0=Mon, 1=Tue, ..., 6=Sun)
+# Sat +25%, Tue/Wed/Thu -10%
+DOW_MULTIPLIERS = [
+    1.0, 0.9, 0.9, 0.9, 1.0, 1.25, 1.1
+]
+
+# Baseline daily volume
+BASE_DAILY_VOLUME = 155
+
+# CTAS Urgency distribution (national averages)
+# Level 1: Resuscitation, Level 5: Non-Urgent
+CTAS_WEIGHTS_DAY   = [0.01, 0.15, 0.35, 0.35, 0.14]
+CTAS_WEIGHTS_NIGHT = [0.02, 0.20, 0.40, 0.30, 0.08]
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -148,10 +176,6 @@ def _choose_disposition(level: int, bed_type: str) -> str:
         return "admit" if roll < 0.55 else "discharge"
     if level == 3:
         return "discharge" if roll < 0.80 else "admit"
-    if level == 4:
-        return "discharge" if roll < 0.92 else "admit"
-    if level == 5:
-        return "discharge" if roll < 0.98 else "admit"
     return "discharge"
 
 
@@ -270,7 +294,8 @@ def generate_events(
 # I/O helpers
 # ---------------------------------------------------------------------------
 
-def save_events_to_csv(events: Sequence[PatientEvent], output_path: Path) -> None:
+def save_events_to_csv(events: Sequence[PatientEvent], output_path: str | Path) -> None:
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=REQUIRED_COLUMNS)

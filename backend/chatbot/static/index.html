@@ -593,6 +593,20 @@
                 </div>
             </div>
             <div class="result-summary" id="result-summary">—</div>
+            
+            <div id="recommendation-section" style="padding: 20px 24px; border-top: 1px solid var(--border); background: rgba(79, 124, 255, 0.05);">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <span style="font-size: 20px;">🛏️</span>
+                    <h3 style="font-size: 16px; font-weight: 600;">Bed Recommendation: <span id="rec-bed" style="color: var(--accent);">—</span></h3>
+                </div>
+                <div id="rec-explanation" style="font-size: 14px; line-height: 1.6; color: var(--text); font-style: italic; background: var(--surface2); padding: 12px; border-radius: 8px; border-left: 4px solid var(--accent);">
+                    Generating explanation...
+                </div>
+                <div style="margin-top: 16px; font-size: 11px; color: var(--text-dim); display: flex; gap: 15px;">
+                    <span>🏥 ED Occupancy: <span id="ed-util" style="color: var(--text);">—</span></span>
+                    <span>🧪 Reservations: <span id="res-count" style="color: var(--text);">—</span></span>
+                </div>
+            </div>
         </div>
 
         <div class="controls">
@@ -705,6 +719,13 @@
             document.getElementById('result-badge').style.background = result.color;
             document.getElementById('result-summary').innerHTML =
                 `<strong>Clinical Summary:</strong> ${result.summary}`;
+            
+            // New: Bed Recommendation & Explanation
+            document.getElementById('rec-bed').textContent = result.recommendation.toUpperCase();
+            document.getElementById('rec-explanation').textContent = result.recommendation_explanation;
+            document.getElementById('ed-util').textContent = result.hospital_state.ed_util;
+            document.getElementById('res-count').textContent = result.hospital_state.reservations;
+            
             resultCard.style.display = 'block';
             resultCard.scrollIntoView({ behavior: 'smooth' });
             resetBtn.style.display = 'block';
