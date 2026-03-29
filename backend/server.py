@@ -1,214 +1,83 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import List
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from __future__ import annotations
+
 import os
-import sys
+from pathlib import Path
 
-# Add backend directory to path so chatbot package resolves correctly
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BACKEND_DIR not in sys.path:
-    sys.path.insert(0, _BACKEND_DIR)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-# Import database module (moved from eHospital)
-# We need to make sure this import works. 
-# Plan: We will duplicate backend/database.py from eHospital to backend/database.py in root.
-try:
-    from backend import database
-except ImportError:
-    import database
+from backend import database
+from backend.api.routes import router as api_router
+from backend.chatbot.chatbot_routes import router as chatbot_router
+from dotenv import load_dotenv
 
-app = FastAPI()
+load_dotenv()
 
-# --- Chatbot Router ---
-try:
-    from chatbot.chatbot_routes import router as chatbot_router
-    app.include_router(chatbot_router, prefix="/chatbot")
-except Exception as _e:
-    print(f"WARNING: Could not load chatbot module: {_e}")
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_BUILD_DIR = BASE_DIR.parent / "frontend" / "build"
+FRONTEND_INDEX = FRONTEND_BUILD_DIR / "index.html"
+FRONTEND_ASSETS_DIR = FRONTEND_BUILD_DIR / "static"
 
-# CORS Middleware
+
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+app = FastAPI(title="Patient Flow Decision Support API", version="beta")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For development convenience
+    allow_origins=_allowed_origins() or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- eHospital Models (from eHospital/backend/main.py) ---
-class SignupRequest(BaseModel):
-    role: str
-    email: str
-    password: str
-    
-class PatientCreate(BaseModel):
-    name: str
-    p_id: int
-    health_card: str
-    notes: str
 
-class TriageSchema(BaseModel):
-    p_id: str
-    arrival_time: str
-    age: int
-    presenting_complaint_Main_Concern: str
-    symptom_location: str
-    symptom_onset: str
-    Pain_assessment_pain_scale: int
-    pain_pattern: str
-    modifying_factors: str
-    red_flag_symptoms: List[str] 
-    cns_speech_clarity: str
-    fever_infection: List[str]
-    respiratory_sob_status: str
-    cough_type: str
-    cardiovascular: List[str]
-    medical_history: List[str]
-    medications_allergies: List[str]
+@app.on_event("startup")
+def startup() -> None:
+    database.init_db()
 
-# --- eHospital API Routes ---
 
-@app.post("/add-patient")
-async def add_patient(patient: PatientCreate):
-    db = database.SessionLocal()
-    try:
-        query = text("""
-            INSERT INTO patients (name, p_id, health_card, notes) 
-            VALUES (:name, :p_id, :health_card, :notes)
-        """)
-        result = db.execute(query, {
-            "name": patient.name,
-            "p_id": patient.p_id,
-            "health_card": patient.health_card,
-            "notes": patient.notes
-        })
-        db.commit()
-        return {"id": result.lastrowid}
-    except Exception as e:
-        db.rollback()
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Database insertion failed")
-    finally:
-        db.close()
+app.include_router(api_router)
+app.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
 
-@app.post("/login")
-async def login(user_data: dict):
-    email = user_data.get("email")
-    password = user_data.get("password")
-    role = user_data.get("role")
-    
-    db = database.SessionLocal()
-    try:
-        query = text("SELECT * FROM users WHERE email = :email AND role = :role AND password_hash = :password")
-        result = db.execute(query, {"email": email, "role": role, "password": password}).fetchone()
-        
-        if not result:
-            raise HTTPException(status_code=400, detail="Invalid Email, Role or Password")
 
-        return {
-            "message": "Login Successful", 
-            "user": result.email, 
-            "role": result.role
-        }
-    finally:
-        db.close()
+if FRONTEND_INDEX.exists():
+    if FRONTEND_ASSETS_DIR.exists():
+        app.mount("/static", StaticFiles(directory=FRONTEND_ASSETS_DIR), name="frontend-static")
 
-@app.post("/signup")
-async def signup(user: SignupRequest):
-    db = database.SessionLocal()
-    try:
-        check_query = text("SELECT * FROM users WHERE email = :email")
-        existing_user = db.execute(check_query, {"email": user.email}).fetchone()
-        
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Email already registered in system")
+    @app.get("/", include_in_schema=False)
+    async def serve_frontend() -> FileResponse:
+        return FileResponse(FRONTEND_INDEX)
 
-        insert_query = text("""
-            INSERT INTO users (role, email, password_hash) 
-            VALUES (:role, :email, :password_hash)
-        """)
-        
-        db.execute(insert_query, {
-            "role": user.role,
-            "email": user.email,
-            "password_hash": user.password  
-        })
-        
-        db.commit()
-        return {"status": "success", "message": "Staff account created and stored in database"}
-
-    except Exception as e:
-        db.rollback()
-        print(f"Signup Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create account")
-    finally:
-        db.close()
-
-@app.post("/submit-triage")
-async def save_triage(data: TriageSchema):
-    db = database.SessionLocal()
-    try:
-        query = text("""
-            INSERT INTO triage_a (
-                p_id, arrival_time, age, presenting_complaint_Main_Concern, 
-                symptom_location, symptom_onset, Pain_assessment_pain_scale, 
-                pain_pattern, modifying_factors, red_flag_symptoms, 
-                cns_speech_clarity, fever_infection, respiratory_sob_status, 
-                cough_type, cardiovascular, medical_history, medications_allergies
-            ) VALUES (
-                :p_id, :at, :age, :pc, :sl, :so, :ps, :pp, :mf, :rf, :csc, :fi, :rss, :ct, :cv, :mh, :ma
-            )
-        """)
-        
-        db.execute(query, {
-            "p_id": data.p_id, "at": data.arrival_time, "age": data.age,
-            "pc": data.presenting_complaint_Main_Concern, "sl": data.symptom_location,
-            "so": data.symptom_onset, "ps": data.Pain_assessment_pain_scale,
-            "pp": data.pain_pattern, "mf": data.modifying_factors,
-            "rf": ", ".join(data.red_flag_symptoms) if data.red_flag_symptoms else "", 
-            "csc": data.cns_speech_clarity, 
-            "fi": ", ".join(data.fever_infection) if data.fever_infection else "", 
-            "rss": data.respiratory_sob_status, 
-            "ct": data.cough_type,
-            "cv": ", ".join(data.cardiovascular) if data.cardiovascular else "", 
-            "mh": ", ".join(data.medical_history) if data.medical_history else "", 
-            "ma": ", ".join(data.medications_allergies) if data.medications_allergies else ""
-        })
-        db.commit()
-        return {"status": "success"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
-
-# --- Static Files / Frontend Serving ---
-
-# 1. Mount the Root Simulation Frontend (Vanilla JS)
-# We want to serve 'frontend/' at '/simulation'
-app.mount("/simulation", StaticFiles(directory="frontend", html=True), name="simulation")
-
-# 2. Mount the eHospital React Build
-# We will build the React app to 'backend/static/ehospital' (or similar)
-# For now, let's assume we will build it to 'eHospital-main/frontend/build' content
-# and copy it to 'backend/static_ehospital'
-
-STATIC_EHOSPITAL = "backend/static_ehospital"
-
-if os.path.exists(STATIC_EHOSPITAL):
-    app.mount("/", StaticFiles(directory=STATIC_EHOSPITAL, html=True), name="ehospital")
+    @app.exception_handler(404)
+    async def spa_fallback(request, exc):
+        path = request.url.path
+        api_prefixes = (
+            "/chatbot",
+            "/triage",
+            "/metrics",
+            "/patient-history",
+            "/clinical",
+            "/login",
+            "/signup",
+            "/add-patient",
+            "/scoring",
+            "/allocate",
+        )
+        if path.startswith(api_prefixes):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        return FileResponse(FRONTEND_INDEX)
 else:
-    print(f"WARNING: Directory {STATIC_EHOSPITAL} not found. eHospital frontend will not be served.")
-
-# Fallback for React Router (Single Page App)
-# If a route is not found in static files or API, return index.html
-@app.exception_handler(404)
-async def custom_404_handler(request, exc):
-    if os.path.exists(f"{STATIC_EHOSPITAL}/index.html"):
-        return FileResponse(f"{STATIC_EHOSPITAL}/index.html")
-    return HTTPException(status_code=404, detail="Page not found")
+    @app.get("/", include_in_schema=False)
+    async def root_status():
+        return {
+            "message": "Patient Flow API running",
+            "frontend_build": False,
+            "frontend_expected_path": str(FRONTEND_INDEX),
+            "chatbot_ui": "/chatbot/ui",
+        }

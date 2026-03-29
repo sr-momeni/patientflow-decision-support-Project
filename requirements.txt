@@ -6,4 +6,7 @@ sqlalchemy
 pymysql
 pydantic
 openai
+httpx
 python-multipart
+
+
