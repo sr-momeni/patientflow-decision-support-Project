@@ -58,7 +58,7 @@ probability = model.predict(
     hour=14,                  # 2 PM
     day_of_week=5,           # Friday
     ed_occupancy=0.8,        # 80% full
-    icu_occupancy=0.6,       # 60% full
+    icu_occupancy=0.60,       # 60% full
     recent_rate=35           # 35 patients/hour
 )
 # Returns: 0.87 (87% chance critical patient coming soon)
