@@ -1,0 +1,11 @@
+{
+  "primary_complaint": "stomach ache with fever",
+  "pain_score": 7,
+  "consciousness": "alert",
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "age": 24,
+  "temperature": 38.5,
+  "summary": "24-year-old with sudden onset stomach pain rated 7 out of 10 and fever, alert, no breathing difficulty or heart issues."
+}

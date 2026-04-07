@@ -23,10 +23,10 @@ class HighUrgencyPredictor:
         self.prediction_window_minutes = prediction_window_minutes
         self.is_trained = False
         
-    def _extract_features(self, timestamp: datetime, ed_occupancy: float, 
-                         icu_occupancy: float, rates: Dict[str, float],
-                         acuity_counts: Dict[int, int]) -> np.ndarray:
-        """Extract features including cyclical time encoding."""
+    def _extract_features(self, timestamp: datetime, ed_occupancy: float = 0.0, 
+                         icu_occupancy: float = 0.0, rates: Dict[str, float] = None,
+                         acuity_counts: Dict[int, int] = None) -> np.ndarray:
+        """Extract features using cyclical time encoding."""
         
         # Cyclical encoding helps the model understand that 23:00 is close to 01:00
         hour_sin = np.sin(2 * np.pi * timestamp.hour / 24.0)
@@ -36,16 +36,7 @@ class HighUrgencyPredictor:
         
         features = [
             hour_sin, hour_cos,
-            dow_sin, dow_cos,
-            ed_occupancy,
-            icu_occupancy,
-            rates.get('15m', 0.0),
-            rates.get('30m', 0.0),
-            rates.get('1h', 0.0),
-            rates.get('4h', 0.0),
-            acuity_counts.get(1, 0),
-            acuity_counts.get(2, 0),
-            acuity_counts.get(3, 0),
+            dow_sin, dow_cos
         ]
         return np.array(features).reshape(1, -1)
     

@@ -1,0 +1,16 @@
+{
+  "primary_complaint": "fever",
+  "pain_score": 4,
+  "consciousness": "verbal",
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "age": 30,
+  "history": [],
+  "summary": "30-year-old with fever over 104, moderate pain, and some confusion but no breathing difficulty.",
+  "temperature": 40,
+  "spo2": 98,
+  "heart_rate": 100,
+  "systolic_bp": 120,
+  "respiratory_rate": 16
+}

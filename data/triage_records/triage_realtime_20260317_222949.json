@@ -1,0 +1,11 @@
+{
+  "primary_complaint": "broken arm",
+  "pain_score": 8,
+  "consciousness": "alert",
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "age": 25,
+  "history": [],
+  "summary": "Patient with a broken arm, pain level 8, alert, no breathing difficulty, no bleeding, no chronic conditions."
+}
