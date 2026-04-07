@@ -1,304 +1,362 @@
-"""
-FastAPI routes for the voice triage chatbot.
+"""FastAPI routes for the triage chatbot.
 Mounted at /chatbot in server.py.
-
-Supports two modes:
-  - Legacy: /message, /transcribe, /speak  (Whisper + GPT-4o text)
-  - Realtime: /realtime-session, /score     (OpenAI Realtime API via WebRTC)
 """
+
+from __future__ import annotations
 
 import io
 import os
-import sys
 import tempfile
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import httpx
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-# Resolve paths
-CHATBOT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.dirname(CHATBOT_DIR)
-ROOT_DIR = os.path.dirname(BACKEND_DIR)
+try:
+    from fastapi import File, UploadFile
+    import multipart  # type: ignore  # noqa: F401
+    MULTIPART_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    File = None  # type: ignore[assignment]
+    UploadFile = None  # type: ignore[assignment]
+    MULTIPART_AVAILABLE = False
 
-if BACKEND_DIR not in sys.path:
-    sys.path.insert(0, BACKEND_DIR)
+from backend import database
+from backend.api.schemas import ChatbotTriageRequest, ClinicalData, NurseVitals
+from backend.api.services import run_triage_pipeline
+from backend.chatbot.chatbot_agent import (
+    TriageChatbotAgent,
+    build_triage_reason,
+    merge_nurse_vitals,
+    require_openai_client,
+    urgency_band,
+    get_openai_api_key,
+)
 
-from chatbot.chatbot_agent import TriageChatbotAgent, client, _API_KEY
-from agents.urgency_scoring_agent import UrgencyScoringAgent
 
 router = APIRouter()
 _agent = TriageChatbotAgent()
-_scorer = UrgencyScoringAgent()
+CHATBOT_DIR = os.path.dirname(os.path.abspath(__file__))
+_UI_FILE = os.path.join(CHATBOT_DIR, "static", "index.html")
+CHATBOT_UI_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
-# ---------------------------------------------------------------------------
-# Realtime API — system prompt & tool definition
-# ---------------------------------------------------------------------------
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FALSE_VALUES = {"0", "false", "no", "off"}
 
-REALTIME_SYSTEM_PROMPT = """You are an experienced emergency department triage nurse conducting an initial patient assessment via voice.
-The patient is physically present in the Emergency Department (ER) and is currently at the triage desk talking to you.
 
-Your job is to gather enough clinical information to determine the patient's urgency level using the CTAS (Canadian Triage and Acuity Scale), then call the complete_triage function.
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return str(raw).strip().lower() in _TRUE_VALUES
 
-CRITICAL RULE — CONTEXT AWARENESS:
-Before asking any question, reason about what the patient has ALREADY told you. If information is clearly implied by their statement, do NOT ask about it.
-Examples:
-- Patient says "I broke my arm" → onset is OBVIOUSLY sudden/traumatic. Do NOT ask "was it sudden or gradual?". Instead ask about pain level, visible deformity, or numbness/tingling.
-- Patient says "I've had chest pain for 3 days" → onset is already known. Do NOT ask when it started.
-- Patient says "I was in a car accident" → mechanism is known. Focus on where they are hurt, any loss of consciousness, or bleeding.
 
-RULES:
-1. Ask ONE question at a time. Never combine questions.
-2. Start by asking what brought them to the ER today.
-3. ONLY ask for information that has NOT already been provided or clearly implied. Adapt your questions to the specific complaint:
-   - TRAUMA (fracture, fall, accident, wound): Ask about pain level (0-10), location, visible deformity, bleeding, sensation/movement ability.
-   - CHEST/CARDIAC: Ask about pain severity, radiation (arm/jaw), shortness of breath, palpitations, sweating.
-   - RESPIRATORY: Ask about breathing difficulty severity, fever, cough, oxygen issues.
-   - GENERAL/MEDICAL: Ask about onset, pain level, associated symptoms, fever, relevant history.
-4. Always collect: pain level (0-10), age, level of consciousness.
-5. Speak in plain, calm, empathetic language. This is a voice call — no lists, no bullet points.
-6. Do NOT diagnose. Only collect information.
+def _realtime_enabled() -> bool:
+    return _env_flag("ENABLE_OPENAI_REALTIME", default=False) and bool(get_openai_api_key())
 
-WHEN YOU HAVE ENOUGH INFORMATION (minimum: chief complaint, pain level, consciousness, and 2 or 3 supporting details relevant to the complaint):
-- Say something like: "Thank you. I now have enough information to calculate your urgency level."
-- Then immediately call the complete_triage function with your best clinical estimates for all required fields.
-- Use safe defaults for any values the patient could not provide (e.g. spo2=98.0, heart_rate=80).
-- For trauma cases: active_seizure=false, uncontrollable_hemorrhage depends on whether the patient described uncontrolled bleeding.
+
+def _audio_enabled() -> bool:
+    if not get_openai_api_key():
+        return False
+    raw = os.getenv("ENABLE_OPENAI_AUDIO") or os.getenv("ENABLE_AUDIO_TRANSCRIPTION")
+    if raw is None or not str(raw).strip():
+        return True
+    return str(raw).strip().lower() not in _FALSE_VALUES
+
+
+def _transcription_model() -> str:
+    return os.getenv("OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe").strip() or "gpt-4o-mini-transcribe"
+
+
+def _realtime_model() -> str:
+    return os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-2025-08-28").strip() or "gpt-realtime-2025-08-28"
+
+
+def _realtime_voice() -> str:
+    return os.getenv("OPENAI_REALTIME_VOICE", "alloy").strip() or "alloy"
+
+
+REALTIME_SYSTEM_PROMPT = """You are an emergency department triage intake assistant using short, realistic ED questioning.
+
+Ask the patient to briefly describe the main symptoms and when they started.
+Do not ask for name, gender, address, health card number, email, phone number, or exact date of birth.
+Use a one-shot style whenever possible and ask no more than 1 or 2 short clarification questions before calling complete_triage.
+If local nurse-entered vitals are supplied separately, use them instead of asking for them again.
+Do not invent normal clinical values. If a measured vital or detail is unknown, return null.
+Keep responses brief, direct, and clinically relevant.
 """
 
 COMPLETE_TRIAGE_TOOL = {
     "type": "function",
     "name": "complete_triage",
-    "description": (
-        "Call this function when you have collected enough information to complete "
-        "the triage assessment. Provide your best clinical estimates for all fields."
-    ),
+    "description": "Call this function when enough clinical detail has been collected to complete triage.",
     "parameters": {
         "type": "object",
         "properties": {
-            "primary_complaint":          {"type": "string",  "description": "Chief complaint as a short phrase"},
-            "pain_score":                 {"type": "integer", "description": "Pain level 0-10"},
-            "consciousness":              {"type": "string",  "enum": ["alert", "verbal", "pain", "unresponsive"]},
-            "spo2":                       {"type": "number",  "description": "Oxygen saturation %, default 98.0"},
-            "heart_rate":                 {"type": "integer", "description": "Heart rate bpm, default 80"},
-            "systolic_bp":                {"type": "integer", "description": "Systolic blood pressure mmHg, default 120"},
-            "respiratory_rate":           {"type": "integer", "description": "Breaths per minute, default 16"},
-            "temperature":                {"type": "number",  "description": "Body temperature Celsius, default 37.0"},
-            "active_seizure":             {"type": "boolean"},
-            "uncontrollable_hemorrhage":  {"type": "boolean"},
-            "resp_distress":              {"type": "string",  "enum": ["none", "mild", "moderate", "severe"]},
-            "age":                        {"type": "integer"},
+            "primary_complaint": {"type": "string"},
+            "pain_score": {"type": ["integer", "null"]},
+            "consciousness": {"type": ["string", "null"], "enum": ["alert", "verbal", "pain", "unresponsive", None]},
+            "spo2": {"type": ["number", "null"]},
+            "heart_rate": {"type": ["integer", "null"]},
+            "systolic_bp": {"type": ["integer", "null"]},
+            "respiratory_rate": {"type": ["integer", "null"]},
+            "temperature": {"type": ["number", "null"]},
+            "active_seizure": {"type": ["boolean", "null"]},
+            "uncontrollable_hemorrhage": {"type": ["boolean", "null"]},
+            "resp_distress": {"type": ["string", "null"], "enum": ["none", "mild", "moderate", "severe", None]},
+            "age": {"type": ["integer", "null"]},
             "history": {
                 "type": "array",
                 "items": {"type": "string", "enum": ["chronic_disease", "immunocompromised", "pregnancy", "stroke_history"]},
-                "description": "Relevant medical history flags"
             },
-            "summary": {"type": "string", "description": "One sentence summarising the patient's presentation"}
+            "summary": {"type": "string"},
         },
         "required": [
-            "primary_complaint", "pain_score", "consciousness",
-            "age", "summary", "active_seizure", "uncontrollable_hemorrhage", "resp_distress"
-        ]
-    }
+            "primary_complaint",
+            "pain_score",
+            "consciousness",
+            "age",
+            "summary",
+            "active_seizure",
+            "uncontrollable_hemorrhage",
+            "resp_distress",
+        ],
+    },
 }
 
-CTAS_DESCRIPTIONS = {
-    1: ("Resuscitation",  "Immediate life-threatening — requires resuscitation now."),
-    2: ("Emergent",       "High risk — must be seen within 15 minutes."),
-    3: ("Urgent",         "Should be seen within 30 minutes."),
-    4: ("Less Urgent",    "Should be seen within 1 hour."),
-    5: ("Non-Urgent",     "Can wait up to 2 hours. Not immediately life-threatening."),
-}
-CTAS_COLORS = {1: "#c0392b", 2: "#e67e22", 3: "#f1c40f", 4: "#27ae60", 5: "#2980b9"}
-
-# ---------------------------------------------------------------------------
-# Request / Response models
-# ---------------------------------------------------------------------------
 
 class MessageRequest(BaseModel):
     message: str
     history: List[Dict[str, Any]] = []
+    nurse_vitals: Optional[NurseVitals] = None
+
 
 class MessageResponse(BaseModel):
     reply: str
     history: List[Dict[str, Any]]
     result: Optional[Dict[str, Any]] = None
 
-class ScoreRequest(BaseModel):
-    clinical_data: Dict[str, Any]
 
-_UI_FILE = os.path.join(CHATBOT_DIR, "static", "index.html")
+def _nurse_vitals_payload(nurse_vitals: Optional[NurseVitals]) -> Optional[Dict[str, Any]]:
+    if nurse_vitals is None:
+        return None
+    payload = nurse_vitals.model_dump(exclude_none=True)
+    return payload or None
 
-# ---------------------------------------------------------------------------
-# Routes — UI
-# ---------------------------------------------------------------------------
+
+def _clinical_data_with_nurse_vitals(clinical_data: ClinicalData, nurse_vitals: Optional[NurseVitals]) -> ClinicalData:
+    payload = merge_nurse_vitals(clinical_data.model_dump(), _nurse_vitals_payload(nurse_vitals))
+    return ClinicalData(**payload)
+
+
+def _legacy_result_from_pipeline(pipeline, reason: Optional[str] = None) -> Dict[str, Any]:
+    clinical_payload = pipeline.clinical_data.model_dump()
+    ctas_level = pipeline.ctas.level
+    return {
+        "patient_id": pipeline.patient_id,
+        "scenario": pipeline.scenario,
+        "ctas_level": ctas_level,
+        "ctas_name": pipeline.ctas.name,
+        "ctas_description": pipeline.ctas.description,
+        "color": pipeline.ctas.color,
+        "summary": pipeline.clinical_data.summary,
+        "clinical_data": clinical_payload,
+        "allocation": pipeline.allocation.model_dump(),
+        "urgency": urgency_band(ctas_level),
+        "reason": reason or build_triage_reason(clinical_payload, ctas_level),
+        "preliminary": pipeline.ctas.preliminary,
+        "missing_vitals": list(pipeline.ctas.missing_vitals),
+        "pipeline": pipeline.model_dump(),
+    }
+
 
 @router.get("/ui")
 @router.get("/ui/")
 async def serve_chatbot_ui():
-    """Serve the voice chatbot HTML page."""
-    return FileResponse(_UI_FILE)
+    return FileResponse(_UI_FILE, headers=CHATBOT_UI_HEADERS)
 
-
-@router.get("/hospital-state")
-async def get_hospital_state():
-    """Return current ED and ICU bed occupancy for the Bed Assignments page."""
-    try:
-        state = _agent.sim_manager.get_current_state()
-        sim = _agent.sim_manager
-        return {
-            "ed_beds_total":    sim.ed_capacity,
-            "ed_beds_occupied": state["ed_occupied"],
-            "ed_beds_reserved": state["ed_reserved"],
-            "icu_beds_total":   sim.icu_capacity,
-            "icu_beds_occupied": state["icu_occupied"],
-            "icu_beds_reserved": state["icu_reserved"],
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not fetch hospital state: {e}")
-
-
-# ---------------------------------------------------------------------------
-# Routes — OpenAI Realtime API (WebRTC)
-# ---------------------------------------------------------------------------
 
 @router.post("/realtime-session")
 async def create_realtime_session():
-    """
-    Creates a short-lived ephemeral token for the OpenAI Realtime API.
-    The browser uses this token to connect directly via WebRTC.
-    """
-    async with httpx.AsyncClient(timeout=15.0) as http:
-        resp = await http.post(
-            "https://api.openai.com/v1/realtime/sessions",
+    api_key = get_openai_api_key()
+    if not _realtime_enabled():
+        raise HTTPException(status_code=503, detail="Realtime voice is disabled for this deployment. Set ENABLE_OPENAI_REALTIME=true and provide OPENAI_API_KEY.")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+
+    try:
+        import httpx
+    except ImportError as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Realtime dependency missing: {exc}") from exc
+
+    session_config = {
+        "type": "realtime",
+        "model": _realtime_model(),
+        "instructions": REALTIME_SYSTEM_PROMPT,
+        "audio": {
+            "input": {"turn_detection": {"type": "server_vad"}},
+            "output": {"voice": _realtime_voice()},
+        },
+        "tools": [COMPLETE_TRIAGE_TOOL],
+        "tool_choice": "auto",
+    }
+
+    async with httpx.AsyncClient(timeout=20.0) as http:
+        response = await http.post(
+            "https://api.openai.com/v1/realtime/client_secrets",
             headers={
-                "Authorization": f"Bearer {_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": "gpt-realtime-2025-08-28",
-                "voice": "alloy",
-                "instructions": REALTIME_SYSTEM_PROMPT,
-                "modalities": ["audio", "text"],
-                "turn_detection": {"type": "server_vad"},
-                "tools": [COMPLETE_TRIAGE_TOOL],
-                "tool_choice": "auto",
-            },
+            json={"session": session_config},
         )
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"OpenAI session creation failed: {resp.text}"
-        )
-    return resp.json()
+
+    if response.status_code not in (200, 201):
+        raise HTTPException(status_code=502, detail=f"OpenAI realtime client secret failed: {response.text}")
+
+    payload = response.json()
+    client_secret_value = payload.get("value") or payload.get("client_secret", {}).get("value", "")
+    if client_secret_value:
+        payload["value"] = client_secret_value
+        payload["client_secret"] = {
+            "value": client_secret_value,
+            "expires_at": payload.get("expires_at") or payload.get("client_secret", {}).get("expires_at"),
+        }
+    payload["session"] = payload.get("session") or session_config
+    payload["transport"] = "webrtc"
+    return payload
 
 
 @router.post("/score")
-async def score_triage(body: ScoreRequest):
-    """
-    Runs UrgencyScoringAgent on clinical data collected by GPT
-    and returns a CTAS result.
-    Called by the browser after a complete_triage function call.
-    """
+async def score_triage(body: ChatbotTriageRequest):
+    db = database.SessionLocal()
     try:
-        data = body.clinical_data
+        clinical_data = _clinical_data_with_nurse_vitals(body.clinical_data, body.nurse_vitals)
+        pipeline = run_triage_pipeline(
+            db=db,
+            patient_id=body.patient_id,
+            scenario_name=body.scenario,
+            clinical_data=clinical_data,
+            raw_form_data={
+                "presenting_complaint_Main_Concern": clinical_data.primary_complaint,
+                "Pain_assessment_pain_scale": clinical_data.pain_score,
+                "age": clinical_data.age,
+                "medical_history": ", ".join(clinical_data.history),
+            },
+            source="chatbot",
+        )
+        return _legacy_result_from_pipeline(pipeline)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Scoring error: {exc}")
+    finally:
+        db.close()
 
-        # Save the clinical data to a JSON file
-        try:
-            records_dir = os.path.join(ROOT_DIR, "data", "triage_records")
-            os.makedirs(records_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"triage_realtime_{timestamp}.json"
-            file_path = os.path.join(records_dir, filename)
-            with open(file_path, "w") as f:
-                json.dump(data, f, indent=2)
-            print(f"DEBUG: Saved realtime assessment to {file_path}")
-        except Exception as e:
-            print(f"WARNING: Could not save realtime assessment JSON: {e}")
-
-        ctas_level = _scorer.calculate_urgency(data)
-        name, description = CTAS_DESCRIPTIONS.get(ctas_level, ("Unknown", ""))
-        color = CTAS_COLORS.get(ctas_level, "#7f8c8d")
-        # Run the real-time simulation allocation
-        sim_result = _agent.sim_manager.process_new_patient(ctas_level)
-        
-        return {
-            "ctas_level":        ctas_level,
-            "ctas_name":         name,
-            "ctas_description":  description,
-            "color":             color,
-            "summary":           data.get("summary", "Assessment complete."),
-            "clinical_data":     data,
-            "recommendation":    sim_result["recommended_bed"],
-            "recommendation_explanation": sim_result["explanation"],
-            "hospital_state":    sim_result["hospital_state"]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scoring error: {str(e)}")
-
-
-# ---------------------------------------------------------------------------
-# Routes — Legacy (Whisper + GPT-4o text, kept as fallback)
-# ---------------------------------------------------------------------------
 
 @router.post("/message", response_model=MessageResponse)
 async def chat_message(body: MessageRequest):
+    nurse_vitals = _nurse_vitals_payload(body.nurse_vitals)
+
     try:
-        reply, result = _agent.chat(body.message, body.history)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+        reply, result = _agent.chat(body.message, body.history, nurse_vitals=nurse_vitals)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Chatbot error: {exc}")
+
     updated_history = list(body.history)
-    updated_history.append({"role": "user",      "content": body.message})
-    updated_history.append({"role": "assistant",  "content": reply})
+    updated_history.append({"role": "user", "content": body.message})
+    updated_history.append({"role": "assistant", "content": reply})
+
+    if result and result.get("clinical_data"):
+        db = database.SessionLocal()
+        try:
+            clinical_data = ClinicalData(**merge_nurse_vitals(result["clinical_data"], nurse_vitals))
+            pipeline = run_triage_pipeline(
+                db=db,
+                patient_id=None,
+                scenario_name="normal",
+                clinical_data=clinical_data,
+                raw_form_data={"presenting_complaint_Main_Concern": clinical_data.primary_complaint},
+                source="chatbot",
+            )
+            result = _legacy_result_from_pipeline(pipeline, reason=result.get("reason"))
+        finally:
+            db.close()
+
     return MessageResponse(reply=reply, history=updated_history, result=result)
 
 
-@router.post("/transcribe")
-async def transcribe_audio(audio: UploadFile = File(...)):
-    tmp_path = None
-    try:
-        audio_bytes = await audio.read()
-        content_type = audio.content_type or ""
-        if "webm" in content_type or (audio.filename or "").endswith(".webm"):
-            suffix = ".webm"
-        elif "ogg" in content_type:
-            suffix = ".ogg"
-        elif "mp4" in content_type or "m4a" in content_type:
-            suffix = ".m4a"
-        else:
-            suffix = ".wav"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
-        with open(tmp_path, "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1", file=f, response_format="text"
-            )
-        return {"transcript": transcript.strip()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+if MULTIPART_AVAILABLE:
+    @router.post("/transcribe")
+    async def transcribe_audio(audio: UploadFile = File(...)):
+        openai_client = require_openai_client()
+        tmp_path = None
+        try:
+            audio_bytes = await audio.read()
+            content_type = audio.content_type or ""
+            if "webm" in content_type or (audio.filename or "").endswith(".webm"):
+                suffix = ".webm"
+            elif "ogg" in content_type:
+                suffix = ".ogg"
+            elif "mp4" in content_type or "m4a" in content_type:
+                suffix = ".m4a"
+            else:
+                suffix = ".wav"
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            with open(tmp_path, "rb") as audio_file:
+                model_name = _transcription_model()
+                try:
+                    transcript = openai_client.audio.transcriptions.create(
+                        model=model_name,
+                        file=audio_file,
+                        response_format="text",
+                    )
+                except Exception:
+                    if model_name == "whisper-1":
+                        raise
+                    audio_file.seek(0)
+                    transcript = openai_client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        response_format="text",
+                    )
+            return {"transcript": transcript.strip()}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Transcription error: {exc}")
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+else:
+    @router.post("/transcribe")
+    async def transcribe_audio_unavailable():
+        raise HTTPException(status_code=503, detail="Audio transcription requires python-multipart and is not enabled")
 
 
 @router.post("/speak")
 async def text_to_speech(body: dict):
-    text = body.get("text", "").strip()
-    if not text:
+    openai_client = require_openai_client()
+    text_value = str(body.get("text", "")).strip()
+    if not text_value:
         raise HTTPException(status_code=400, detail="No text provided.")
     try:
-        response = client.audio.speech.create(
-            model="tts-1", voice="alloy", input=text, response_format="mp3"
+        response = openai_client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text_value,
+            response_format="mp3",
         )
         return StreamingResponse(
             io.BytesIO(response.content),
             media_type="audio/mpeg",
             headers={"Content-Disposition": "inline; filename=reply.mp3"},
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"TTS error: {str(e)}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"TTS error: {exc}")
