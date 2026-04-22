@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import "./Dashboard.css";
 import ehosp from "./assets/ehosp.png";
 import { apiGet, apiPost, apiUrl } from "./api";
+import { IMAGING_SERVICES, LAB_SERVICES } from "./serviceCatalog";
 
 const WARD_OPTIONS = ["Cardiology", "Neurology", "ICU", "General Ward", "Surgery", "Observation Unit"];
 
@@ -21,6 +22,8 @@ const BedDetail = () => {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [ward, setWard] = useState("Cardiology");
+  const [labService, setLabService] = useState(LAB_SERVICES[0]);
+  const [imagingService, setImagingService] = useState(IMAGING_SERVICES[0]);
   const [confirmTransfer, setConfirmTransfer] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -55,9 +58,10 @@ const BedDetail = () => {
     if (!detail?.patient?.patient_id) return;
     setActionLoading(true);
     setNotice("");
+    setError("");
     try {
       await apiPost("/beds/discharge", { patient_id: detail.patient.patient_id, scenario: "normal" });
-      setNotice("Patient discharged and bed released.");
+      setNotice("Patient discharged. Bed moved to cleaning and is not yet available.");
       await loadDetail();
     } catch (actionError) {
       setError(actionError.message);
@@ -70,9 +74,10 @@ const BedDetail = () => {
     if (!detail?.patient?.patient_id || !ward) return;
     setActionLoading(true);
     setNotice("");
+    setError("");
     try {
       await apiPost("/beds/transfer", { patient_id: detail.patient.patient_id, ward, scenario: "normal" });
-      setNotice(`Patient transferred to ${ward} and bed released.`);
+      setNotice(`Patient transferred to ${ward}. Bed moved to cleaning and is not yet available.`);
       setConfirmTransfer(false);
       await loadDetail();
     } catch (actionError) {
@@ -82,14 +87,35 @@ const BedDetail = () => {
     }
   };
 
-  const handleSendToService = async (service) => {
+  const handleCleaningComplete = async () => {
+    setActionLoading(true);
+    setNotice("");
+    setError("");
+    try {
+      await apiPost("/beds/cleaning-complete", { bed_id, scenario: "normal" });
+      setNotice("Cleaning complete. Bed is now available for allocation.");
+      await loadDetail();
+    } catch (actionError) {
+      setError(actionError.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSendToService = async (service, requestedService) => {
     if (!detail?.patient?.patient_id) return;
     setActionLoading(true);
     setNotice("");
+    setError("");
     try {
-      const response = await apiPost("/patient/send-to-service", { p_id: detail.patient.patient_id, service, scenario: "normal" });
+      const response = await apiPost("/patient/send-to-service", {
+        p_id: detail.patient.patient_id,
+        service,
+        requested_service: requestedService,
+        scenario: "normal",
+      });
       setDetail(response);
-      setNotice(`Patient sent to ${service}.`);
+      setNotice(`Patient sent to ${service} for ${requestedService}. They now appear in the ${service} queue.`);
     } catch (actionError) {
       setError(actionError.message);
     } finally {
@@ -105,6 +131,9 @@ const BedDetail = () => {
     ["Respiratory Rate", detail?.patient?.respiratory_rate ? `${detail.patient.respiratory_rate}/min` : null],
   ];
 
+  const normalizedStatus = (detail?.bed_status || "").toLowerCase();
+  const locationLabel = detail?.current_location ? String(detail.current_location).toLowerCase() : "";
+
   return (
     <div className="dashboard-container">
       <div className="sidebar">
@@ -115,6 +144,8 @@ const BedDetail = () => {
           <div className="nav-item" onClick={() => navigate("/dashboard")}><span style={{ marginRight: "12px" }}>Home</span> Dashboard</div>
           <div className="nav-item" onClick={() => navigate("/new-patient")}><span style={{ marginRight: "12px" }}>+</span> Add New Patient</div>
           <div className="nav-item active" onClick={() => navigate("/bed-assignments")}><span style={{ marginRight: "12px" }}>Bed</span> Assignments</div>
+          <div className="nav-item" onClick={() => navigate("/lab")}><span style={{ marginRight: "12px" }}>Lab</span> Lab</div>
+          <div className="nav-item" onClick={() => navigate("/imaging")}><span style={{ marginRight: "12px" }}>Img</span> Imaging</div>
           <a className="nav-item" href={chatbotUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}><span style={{ marginRight: "12px" }}>AI</span> Triage Agent</a>
         </div>
         <div className="logout-section" onClick={handleLogout}><span style={{ marginRight: "12px" }}>Log out</span></div>
@@ -145,7 +176,7 @@ const BedDetail = () => {
                 <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                   <div className="stat-card"><div className="stat-header"><span>Bed ID</span></div><div className="stat-body"><p>{detail.bed_id}</p></div></div>
                   <div className="stat-card"><div className="stat-header"><span>Status</span></div><div className="stat-body"><p>{detail.bed_status}</p></div></div>
-                  <div className="stat-card"><div className="stat-header"><span>Current Location</span></div><div className="stat-body"><p>{detail.current_location}</p></div></div>
+                  <div className="stat-card"><div className="stat-header"><span>Current Location</span></div><div className="stat-body"><p style={{ textTransform: "capitalize" }}>{detail.current_location}</p></div></div>
                 </div>
               </div>
 
@@ -153,11 +184,13 @@ const BedDetail = () => {
                 <h3 style={{ marginTop: 0 }}>Patient Info</h3>
                 {detail.patient ? (
                   <>
-                    <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "18px" }}>
+                    <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "18px" }}>
                       <div className="stat-card"><div className="stat-header"><span>Patient ID</span></div><div className="stat-body"><p>{detail.patient.patient_id}</p></div></div>
                       <div className="stat-card"><div className="stat-header"><span>CTAS</span></div><div className="stat-body"><p>{detail.patient.ctas_level}</p></div></div>
                       <div className="stat-card"><div className="stat-header"><span>Urgency</span></div><div className="stat-body"><p>{detail.patient.urgency}</p></div></div>
                       <div className="stat-card"><div className="stat-header"><span>Wait Time</span></div><div className="stat-body"><p>{Math.round(detail.patient.wait_time || 0)} min</p></div></div>
+                      <div className="stat-card"><div className="stat-header"><span>Location</span></div><div className="stat-body"><p style={{ textTransform: "capitalize" }}>{detail.current_location}</p></div></div>
+                      <div className="stat-card"><div className="stat-header"><span>Requested Service</span></div><div className="stat-body"><p>{displayValue(detail.patient.requested_service)}</p></div></div>
                     </div>
                     <div className="ai-card critical" style={{ marginBottom: "16px" }}>
                       <h4>Clinical Summary</h4>
@@ -170,7 +203,10 @@ const BedDetail = () => {
                     </div>
                   </>
                 ) : (
-                  <div className="ai-card critical"><h4>No patient assigned</h4><p>This bed currently has no active patient assignment.</p></div>
+                  <div className="ai-card critical">
+                    <h4>No patient assigned</h4>
+                    <p>{normalizedStatus === "cleaning" ? "Cleaning is in progress. The bed will return to the allocation cycle after cleaning completion is confirmed." : "This bed currently has no active patient assignment."}</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -192,12 +228,47 @@ const BedDetail = () => {
                       Transfer Patient
                     </button>
                   </div>
-                  <div style={{ marginTop: "14px", display: "grid", gap: "10px" }}>
-                    <button className="execute-btn" onClick={() => handleSendToService("lab")} disabled={actionLoading} style={{ background: "#4318FF" }}>Send to Lab</button>
-                    <button className="execute-btn" onClick={() => handleSendToService("imaging")} disabled={actionLoading} style={{ background: "#0095FF" }}>Send to Imaging</button>
-                    <button className="execute-btn" onClick={() => navigate(`/patient/${detail.patient.patient_id}`)} style={{ background: "#A3AED0" }}>Open Patient Detail</button>
+                  <div className="ai-card critical" style={{ marginTop: "14px" }}>
+                    <h4>Send to Lab</h4>
+                    <p style={{ color: "#707EAE", fontSize: "13px", lineHeight: 1.7 }}>Choose the exact lab test. The patient will appear in the Lab queue immediately.</p>
+                    <select value={labService} onChange={(event) => setLabService(event.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "12px", border: "1px solid #DCE3F1", marginBottom: "10px" }}>
+                      {LAB_SERVICES.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button className="execute-btn" onClick={() => handleSendToService("lab", labService)} disabled={actionLoading} style={{ background: "#4318FF", flex: 1 }}>Send to Lab</button>
+                      <button className="execute-btn" onClick={() => navigate("/lab")} style={{ background: "#A3AED0", flex: 1 }}>Open Lab Queue</button>
+                    </div>
                   </div>
+                  <div className="ai-card critical" style={{ marginTop: "14px" }}>
+                    <h4>Send to Imaging</h4>
+                    <p style={{ color: "#707EAE", fontSize: "13px", lineHeight: 1.7 }}>Choose the imaging study. The patient will appear in the Imaging queue immediately.</p>
+                    <select value={imagingService} onChange={(event) => setImagingService(event.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "12px", border: "1px solid #DCE3F1", marginBottom: "10px" }}>
+                      {IMAGING_SERVICES.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button className="execute-btn" onClick={() => handleSendToService("imaging", imagingService)} disabled={actionLoading} style={{ background: "#0095FF", flex: 1 }}>Send to Imaging</button>
+                      <button className="execute-btn" onClick={() => navigate("/imaging")} style={{ background: "#A3AED0", flex: 1 }}>Open Imaging Queue</button>
+                    </div>
+                  </div>
+                  {(locationLabel === "lab" || locationLabel === "imaging") ? (
+                    <div className="ai-card critical" style={{ marginTop: "14px" }}>
+                      <h4>Current downstream routing</h4>
+                      <p style={{ marginBottom: "12px" }}>This patient is currently assigned to {locationLabel} {detail.patient.requested_service ? `for ${detail.patient.requested_service}` : ""}.</p>
+                      <button className="execute-btn" onClick={() => navigate(`/${locationLabel}`)} style={{ background: locationLabel === "lab" ? "#4318FF" : "#0095FF" }}>
+                        Open {locationLabel === "lab" ? "Lab" : "Imaging"} queue
+                      </button>
+                    </div>
+                  ) : null}
+                  <button className="execute-btn" onClick={() => navigate(`/patient/${detail.patient.patient_id}`)} style={{ marginTop: "14px", background: "#A3AED0" }}>Open Patient Detail</button>
                 </>
+              ) : normalizedStatus === "cleaning" ? (
+                <div className="ai-card critical">
+                  <h4>Cleaning required</h4>
+                  <p>This bed is currently unavailable while cleaning is in progress.</p>
+                  <button className="execute-btn" onClick={handleCleaningComplete} disabled={actionLoading} style={{ background: "#05CD99" }}>
+                    {actionLoading ? "Updating..." : "Mark cleaning complete"}
+                  </button>
+                </div>
               ) : (
                 <div className="ai-card critical"><h4>No patient actions available</h4><p>This bed is currently {detail.bed_status.toLowerCase()}.</p></div>
               )}

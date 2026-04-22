@@ -52,6 +52,8 @@ _PII_REPLACEMENTS = [
     (re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b"), "[REDACTED_DOB]"),
     (re.compile(r"\b\d{1,5}\s+[A-Za-z0-9.\- ]+\s(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct)\b", re.IGNORECASE), "[REDACTED_ADDRESS]"),
     (re.compile(r"\bmy name is\s+[A-Za-z]+(?:\s+[A-Za-z]+){0,2}\b", re.IGNORECASE), "my name is [REDACTED_NAME]"),
+    (re.compile(r"\b(?:name|full name)\s*:\s*[A-Za-z]+(?:\s+[A-Za-z]+){0,2}\b", re.IGNORECASE), "name: [REDACTED_NAME]"),
+    (re.compile(r"\b(?:health\s*card|healthcard)\s*(?:number)?\s*:\s*[A-Za-z0-9-]+\b", re.IGNORECASE), "health card: [REDACTED_HEALTH_ID]"),
 ]
 
 
@@ -121,6 +123,7 @@ VITAL_FIELDS = ("systolic_bp", "temperature", "heart_rate", "spo2", "respiratory
 
 
 def sanitize_pii_text(text: str) -> str:
+    """Redact personal identifiers so only anonymized symptom text is sent to OpenAI."""
     sanitized = text or ""
     for pattern, replacement in _PII_REPLACEMENTS:
         sanitized = pattern.sub(replacement, sanitized)

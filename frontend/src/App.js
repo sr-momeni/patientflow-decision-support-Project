@@ -15,6 +15,8 @@ import BedAssignments from "./BedAssignments";
 import TriageFinalize from "./TriageFinalize";
 import BedDetail from "./BedDetail";
 import PatientDetail from "./PatientDetail";
+import LabPage from "./LabPage";
+import ImagingPage from "./ImagingPage";
 
 const LandingPage = () => (
   <div className="container">
@@ -57,6 +59,8 @@ function App() {
         <Route path="/bed/:bed_id" element={<BedDetail />} />
         <Route path="/patient/:p_id" element={<PatientDetail />} />
         <Route path="/triage-finalize/:p_id" element={<TriageFinalize />} />
+        <Route path="/lab" element={<LabPage />} />
+        <Route path="/imaging" element={<ImagingPage />} />
       </Routes>
     </Router>
   );

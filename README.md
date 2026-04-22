@@ -1,277 +1,239 @@
-# Patient Flow Decision Support System (Full Documentation)
+﻿# eHospital Triage Agent and ED Decision Support System
 
-This document provides a comprehensive breakdown of every file and directory in this project. The system is a multi-layered application combining machine learning, discrete-event simulation, and a full-stack hospital management platform.
+A unified Emergency Department decision-support platform built with React, FastAPI, and a live triage workflow. This branch integrates patient registration, symptom-only AI intake, CTAS scoring, nurse vitals finalization, resource allocation, live dashboard metrics, bed assignments, and operational patient tracking into one coherent eHospital experience.
 
-##  Overview
+## Overview
 
-This system implements a **Predictive Bed Allocation AI** that:
-- Predicts when critical patients (Urgency Level 1) will arrive
-- Proactively reserves beds before they arrive
-- Reduces wait times for life-threatening cases by 20-40% (target)
-- Balances resource efficiency with patient safety
+This project is designed to support Emergency Department intake and operational decision-making without replacing clinical judgment.
 
-##  How the AI Works
+Core principles in the current system:
+- Registration and patient identity stay in the local hospital workflow.
+- The AI Triage Agent handles symptom-only intake.
+- Final CTAS scoring is rule-based and remains separate from the LLM.
+- Missing nurse vitals keep an assessment preliminary.
+- Resource allocation, patient history, and bed availability are fed from the same backend pipeline.
 
-### High-Level Flow
+## End-to-End Workflow
 
-```
-Patient Arrives → AI Predicts Critical Patient Coming → Reserve Bed → Assign When Critical Patient Arrives
-```
-
-### 1. Machine Learning Model (`backend/ml/predictor.py`)
-
-**What It Predicts**: *"What's the probability a critical (Urgency Level 1) patient will arrive in the next 30 minutes?"*
-
-**Training Data**: Historical patient arrival patterns
-
-**Input Features**:
-- **Time patterns**: Hour of day, day of week (e.g., Friday nights are busier)
-- **Hospital state**: Current ED occupancy (%), ICU occupancy (%)
-- **Recent trends**: Patient arrival rate in last 2 hours
-
-**Model Type**: Random Forest Classifier
-- 100 decision trees
-- Each tree votes on the prediction
-- Final probability = % of trees voting "yes"
-
-**Performance**: 
-- Precision: 94.4%
-- Recall: 94.1%
-- F1-Score: 94.2%
-
-### 2. Predictive Simulation Engine (`backend/simulation/predictive_engine.py`)
-
-**Real-time Decision Process**:
-
-#### When a New Patient Arrives:
-
-**Step 1: Calculate Current State**
-```python
-ed_occupancy = beds_in_use / 50  # e.g., 40/50 = 80%
-icu_occupancy = beds_in_use / 20
-recent_rate = arrivals_last_2_hours / 2  # patients per hour
+```text
+Patient Registration (local)
+  -> Manual Triage or AI Triage Agent (text / voice)
+  -> Structured clinical data
+  -> CTAS scoring
+  -> Nurse vitals finalization when needed
+  -> Resource allocation and prioritization
+  -> Persistence to patient history
+  -> Live dashboard, clinical summary, and bed assignments
 ```
 
-**Step 2: Query AI Model**
-```python
-probability = model.predict(
-    hour=14,                  # 2 PM
-    day_of_week=5,           # Friday
-    ed_occupancy=0.8,        # 80% full
-    icu_occupancy=0.6,       # 60% full
-    recent_rate=35           # 35 patients/hour
-)
-# Returns: 0.87 (87% chance critical patient coming soon)
+## Key Features
+
+### Clinical workflow
+- Manual multi-step triage flow integrated with the main backend.
+- AI Triage Agent for symptom-only intake through text and voice.
+- CTAS-based urgency scoring via the existing `UrgencyScoringAgent`.
+- Nurse finalization step for measured vitals:
+  - systolic blood pressure
+  - temperature
+  - heart rate
+  - SpO2
+  - respiratory rate
+- Clear distinction between preliminary and final CTAS results.
+- No fabricated normal vitals injected when measurements are missing.
+
+### Operations and decision support
+- Live resource allocation using the existing allocation agent.
+- Dashboard with current queue, metrics, latest recommendation, and patient history.
+- Bed Assignments page with ED and ICU capacity overview.
+- Bed detail page with discharge, transfer, lab, and imaging actions.
+- Patient detail page with editable clinical summary and nurse vitals.
+
+### AI and privacy
+- OpenAI-backed triage intake for chatbot text flow and voice flow.
+- Symptom-only LLM intake with PII sanitization before model calls.
+- Patient identity remains outside the cloud triage path.
+- LLM supports intake, clarification, transcription, and voice interaction, but not final CTAS decision-making.
+
+### Research and simulation support
+- Scenario modeling for normal, ED congestion, and ICU bottleneck conditions.
+- Predictive and simulation modules remain available for evaluation and research workflows.
+- The live product UI no longer depends on static demo dashboards or CSV-backed pages.
+
+## Current Product Pages
+
+The current React application includes:
+- `/dashboard` - operational dashboard
+- `/new-patient` - patient registration
+- `/triage-form`, `/triage-form-2`, `/triage-form-3` - manual triage workflow
+- `/clinical/:p_id` - patient clinical summary
+- `/triage-finalize/:p_id` - nurse vitals finalization page
+- `/bed-assignments` - bed availability and assignments
+- `/bed/:bed_id` - bed detail view
+- `/patient/:p_id` - patient detail and edit view
+- `/chatbot/ui` - AI Triage Agent UI
+
+## Main Backend API Surface
+
+### Core workflow
+- `POST /add-patient`
+- `POST /login`
+- `POST /signup`
+- `POST /triage/manual`
+- `POST /triage/chatbot`
+- `POST /triage-finalize`
+- `POST /scoring`
+- `POST /allocate`
+- `GET /metrics`
+- `GET /patient-history`
+- `GET /clinical/{p_id}`
+
+### Bed and patient operations
+- `GET /bed-availability`
+- `GET /beds/{bed_id}`
+- `POST /beds/discharge`
+- `POST /beds/transfer`
+- `POST /beds/cleaning-complete`
+- `POST /patient/send-to-service`
+- `POST /patient/update`
+
+### Triage Agent routes
+- `GET /chatbot/ui`
+- `POST /chatbot/message`
+- `POST /chatbot/score`
+- `POST /chatbot/realtime-session`
+- `POST /chatbot/transcribe`
+- `POST /chatbot/speak`
+
+## Architecture
+
+### Active runtime
+- Single backend entry point: [`backend/server.py`](backend/server.py)
+- Main API routes: [`backend/api/routes.py`](backend/api/routes.py)
+- Orchestration and live workflow services: [`backend/api/services.py`](backend/api/services.py)
+- Database bootstrap and session layer: [`backend/database.py`](backend/database.py)
+
+### Core decision modules
+- CTAS scoring: [`backend/agents/urgency_scoring_agent.py`](backend/agents/urgency_scoring_agent.py)
+- Resource allocation: [`backend/agents/resource_allocation_agent.py`](backend/agents/resource_allocation_agent.py)
+- Scenario configuration: [`backend/optimization/congestion_scenarios.py`](backend/optimization/congestion_scenarios.py)
+
+### AI intake layer
+- Chatbot agent: [`backend/chatbot/chatbot_agent.py`](backend/chatbot/chatbot_agent.py)
+- Chatbot routes: [`backend/chatbot/chatbot_routes.py`](backend/chatbot/chatbot_routes.py)
+- Chatbot UI: [`backend/chatbot/static/index.html`](backend/chatbot/static/index.html)
+
+### Frontend
+- React application: [`frontend/src`](frontend/src)
+- Dashboard: [`frontend/src/Dashboard.js`](frontend/src/Dashboard.js)
+- Bed operations: [`frontend/src/BedAssignments.js`](frontend/src/BedAssignments.js)
+- Nurse finalization: [`frontend/src/TriageFinalize.js`](frontend/src/TriageFinalize.js)
+
+## Repository Structure
+
+```text
+backend/
+  agents/                CTAS scoring and allocation logic
+  api/                   Pydantic schemas, routes, orchestration services
+  chatbot/               AI Triage Agent routes, prompts, and UI
+  ml/                    predictive model utilities
+  optimization/          scenarios and evaluation tools
+  simulation/            simulation engines and metrics tooling
+  database.py            DB config and bootstrap
+  server.py              unified FastAPI app
+
+frontend/
+  src/                   React application pages and API client
+
+data/
+  evaluation data and local artifacts used for analysis
 ```
 
-**Step 3: Decision Logic**
-```python
-if probability > 0.70:  # 70% threshold
-    reserve_1_ed_bed()
-    reserve_1_icu_bed()
-    set_timeout(30_minutes)  # Reservation expires if unused
-```
-
-**Step 4: Bed Assignment Rules**
-- **Urgency Level 1 (Critical)**: Can use ANY bed (including reserved)
-- **Urgency Level 2/3**: Can only use NON-reserved beds
-- If all regular beds full → they wait, even if reserved beds are empty
-
-### 3. Reservation System
-
-```
-Regular Bed Pool:     [■][■][■][■][■][■][■]... (48 beds)
-Reserved Bed Pool:    [R][R]                    (2 beds)
-                       ↑  ↑
-                       Only for Urgency 1
-```
-
-**When a Critical Patient Arrives**:
-1. Uses a reserved bed instantly
-2. Reservation count decreases
-3. Bed gets freed when patient is discharged
-
-**When Reservation Times Out (30 min)**:
-1. If no critical patient arrived
-2. Reserved beds release back to regular pool
-3. Waiting low-urgency patients can now use them
-
-### 4. Real Example
-
-**Scenario**: Friday 2 PM, Hospital is 80% Full
-
-```
-2:00 PM - Patient #47 (Urgency 3) arrives
-         → AI checks: "87% chance critical patient in next 30 min"
-         → Reserve 1 ED bed
-         → Patient #47 waits (48 beds available, 1 reserved)
-
-2:15 PM - Patient #48 (Urgency 1) arrives!
-         → Gets reserved bed instantly (wait time = 0 min)
-         → Reservation released
-
-2:30 PM - If Patient #48 hadn't arrived
-         → Reservation expires
-         → Patient #47 gets the bed
-```
-
-##  Project Structure
-
-```
-patientflow-decision-support-Project/
-├── backend/
-│   ├── ml/
-│   │   ├── predictor.py           # ML model for urgency prediction
-│   │   └── train_model.py         # Training script
-│   ├── simulation/
-│   │   ├── event_model.py         # Patient and Hospital state models
-│   │   ├── engine.py              # Standard FCFS simulation
-│   │   ├── predictive_engine.py   # AI-powered simulation
-│   │   ├── run_fcfs.py            # Run FCFS simulation
-│   │   └── run_predictive.py      # Run predictive simulation
-│   ├── data/
-│   │   └── synthetic_generator.py # Generate synthetic patient data
-│   └── optimization/
-│       ├── allocation_rules.py    # Bed allocation logic
-│       └── constraints.py         # Hospital capacity constraints
-├── frontend/
-│   ├── index.html                 # Interactive timeline dashboard
-│   ├── script.js                  # Visualization logic
-│   └── style.css                  # Modern UI styling
-├── data/
-│   ├── patients_2500.csv          # Original dataset
-│   ├── patients_fcfs.csv          # FCFS simulation results
-│   └── patients_predictive.csv    # AI simulation results
-├── models/
-│   └── urgency_predictor.pkl      # Trained ML model
-└── convert_data.py                # CSV to frontend data converter
-```
-
-##  Setup Instructions
+## Running the Project Locally
 
 ### Prerequisites
-- Python 3.8+
-- pip
+- Python 3.10+
+- Node.js 18+
+- npm
 
-### Installation
+### 1. Backend setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/salkhokhar/patientflow-decision-support-Project.git
-cd patientflow-decision-support-Project
-
-# Install dependencies
 pip install -r requirements.txt
+uvicorn backend.server:app --reload
 ```
 
-### Train the ML Model
+The backend starts on `http://127.0.0.1:8000` by default.
+
+### 2. Frontend setup
 
 ```bash
-# Generate synthetic patient data (if not already present)
-python -m backend.data.synthetic_generator --n 2500 --output data/patients_2500.csv
-
-# Train the predictive model
-python -m backend.ml.train_model
+cd frontend
+npm install
+npm start
 ```
 
-### Run Simulations
+For local development, set the frontend API base URL before starting the React app.
+
+PowerShell example:
+
+```powershell
+$env:REACT_APP_API_BASE_URL="http://127.0.0.1:8000"
+npm start
+```
+
+### 3. Optional production-style frontend build
 
 ```bash
-# Run predictive AI simulation
-python -m backend.simulation.run_predictive
-
-# Convert data for frontend
-python convert_data.py
+cd frontend
+npm run build
 ```
 
-### View Dashboard
+If a React build exists, the FastAPI backend can serve it directly.
 
-Open `frontend/index.html` in a web browser to see:
-- Interactive Gantt chart timeline
-- Toggle between "Original" and "Predictive AI Allocation"
-- Zoom/pan controls
-- Patient wait time statistics
+## Environment Variables
 
-##  Performance Comparison
+Common environment variables used by the current branch:
 
-| Urgency Level | Original (min) | Predictive AI (min) | Target Improvement |
-|---------------|----------------|---------------------|-------------------|
-| **Level 1 (Critical)** | 177 | 2,825* | -20% to -40% |
-| Level 2 | 520 | 8,711* | N/A |
-| Level 3 | 612 | 9,893* | N/A |
+```env
+DATABASE_URL=
+MYSQL_DATABASE_URL=
+OPENAI_API_KEY=
+ENABLE_OPENAI_REALTIME=true
+ENABLE_AUDIO_TRANSCRIPTION=true
+CORS_ORIGINS=http://localhost:3000
+REACT_APP_API_BASE_URL=http://127.0.0.1:8000
+```
 
-*Current implementation has a reservation release bug. Fix in progress.
+Notes:
+- `DATABASE_URL` or `MYSQL_DATABASE_URL` can be used for the database connection.
+- The backend can fall back to a local SQLite database if no external DB URL is configured.
+- Voice features require a valid `OPENAI_API_KEY`.
 
-##  Known Issues
+## Clinical Logic Notes
 
-### Reservation Logic Bug
-**Issue**: Beds aren't releasing properly after timeout or when critical patients use them.
+- The AI Triage Agent does not make the final CTAS decision on its own.
+- CTAS is produced by the existing rule-based urgency scoring logic.
+- If measured nurse vitals are missing, the assessment remains preliminary until finalized.
+- The system is built to support clinical workflow, not replace clinician judgment.
 
-**Impact**: System performs like FCFS instead of showing wait time improvements.
+## Validation Status
 
-**Fix Required**:
-- Track individual reservation expiry times
-- Release beds when used OR timeout
-- Update effective capacity dynamically
+This branch has already been aligned to the integrated final-stage workflow:
+- unified FastAPI backend
+- working dashboard
+- working text triage agent
+- working voice path support
+- live triage, scoring, allocation, metrics, history, and clinical summary integration
+- live bed availability, bed detail, and patient detail flows
 
-##  Features
+## Team
 
-- **Interactive Timeline**: Zoom and pan through patient flow
-- **Color-coded Urgency**: Visual distinction between patient priorities
-- **Separate ED/ICU Tracking**: Independent capacity management
-- **Real-time Statistics**: Live calculation of wait times and occupancy
-- **Comparison Mode**: Toggle between allocation strategies
+Project contributors listed in the original repository materials:
+- Salar Momeni
+- Sal Khokhar
+- Dima Alqaruoti
+- Akanksha R. Swamy
 
-##  License
+## License
 
-## 📂 Root Directory
-*   **`Chatbot`**: Entry point or utility script for the chatbot interface.
-*   **`advanced_analysis.py`**: A powerful metrics engine that parses `simulation_events.log`. It calculates:
-    *   Reservation Accuracy (Successful Catches vs. Expired Holds).
-    *   Bed Occupancy Rate comparison (FCFS vs. AI).
-    *   "Opportunity Cost" (Total wasted bed-minutes from false-positive reservations).
-    *   Generates `reservation_pie.png` and `bed_time_bar.png`.
-*   **`visualize_comparison.py`**: Generates high-level statistical reports comparing wait times and LOS across all urgency levels. Outputs `comparison_plot.png`.
-*   **`patient_arrival_analysis.py`**: Statistical analyzer for raw arrival data. Helps verify if the synthetic generator is accurately mimicking national triage distributions.
-*   **`convert_data.py`**: Data transformation utility. It converts backend simulation CSVs into the specific JSON/Array format required by the `frontend/script.js` for timeline rendering.
-*   **`debug_analysis.py`**: A lightweight script for troubleshooting simulation logs and identifying malformed events.
-*   **`requirements.txt`**: Project dependencies (FastAPI, Scikit-learn, Pandas, Seaborn, etc.).
-*   **`pytest.ini`**: Configuration for automated backend testing.
-*   **`openAI_key.txt`**: Secret storage for the Chatbot LLM integration (if enabled).
-
-##  Authors
-Salar Momeni
-Sal Khokhar
-Dima Alqaruoti
-Akanksha R.Swamy
-
----
-
-##  Technical Details
-
-*   **`index.html`**: Dashboard layout with occupancy gauges, wait-time panels, and a Gantt chart container.
-*   **`script.js`**: Massive UI engine.
-    *   Handles timeline zooming/panning.
-    *   Calculates average wait times from simulation data on-the-fly.
-    *   Renders patient "lane" assignments in the Gantt chart.
-*   **`data_predictive.js` / `data_fcfs.js`**: Transformed data payloads generated by `convert_data.py`.
-
----
-
-## 📊 Data & Assets
-*   **`/data/raw/`**: Source CSVs from the `synthetic_generator.py`.
-*   **`/data/plots/`**: Visual evidence generated by the evaluation suite (pie charts, line graphs).
-*   **`/models/`**: Stores the binary trained model file (`.pkl`).
-*   **`/backend/legacy_v1/`**: An archive of the initial project version before the Priority Aging and DES overhaul.
-
-##  Future Enhancements
-
-## 🛠️ Key Scripts Summary
-| Script | Purpose |
-| :--- | :--- |
-| `train_model.py` | Trains the AI to forecast arrival spikes. |
-| `run_predictive.py` | Simulates hospital flow using the AI and Priority Aging. |
-| `evaluate_agent.py` | Generates 15+ comparative metrics (Baseline vs. AI). |
-| `convert_data.py` | Bridges Backend simulation → Frontend visualization. |
-| `server.py` | Hosts the entire platform (Chatbot, Dashboard, eHospital). |
-| `advanced_analysis.py` | Calculates the "Opportunity Cost" of bed reservations. |
+This repository is currently presented as an academic / project codebase. Add your preferred license here before public release.

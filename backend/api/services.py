@@ -24,6 +24,8 @@ from backend.api.schemas import (
     FinalizedTriageResponse,
     MetricsResponse,
     PatientHistoryItem,
+    ServiceQueueItem,
+    ServiceQueueResponse,
     TriagePipelineResponse,
 )
 from backend.chatbot.chatbot_agent import build_triage_reason, urgency_band
@@ -46,6 +48,14 @@ VITAL_LABELS = {
     "heart_rate": "Heart rate",
     "spo2": "SpO2",
     "respiratory_rate": "Respiratory rate",
+}
+SERVICE_CATALOG = {
+    "lab": ["Blood Test", "Urine Test", "CBC", "Biochemistry Panel"],
+    "imaging": ["X-Ray", "CT Scan", "MRI", "Ultrasound"],
+}
+SERVICE_WAIT_MINUTES = {
+    "lab": {"Blood Test": 12.0, "Urine Test": 8.0, "CBC": 15.0, "Biochemistry Panel": 20.0},
+    "imaging": {"X-Ray": 15.0, "CT Scan": 30.0, "MRI": 45.0, "Ultrasound": 20.0},
 }
 
 
@@ -377,14 +387,20 @@ def _ensure_patient_exists(db: Session, patient_id: str, raw_form_data: Optional
     if exists:
         return
 
-    name = _to_text((raw_form_data or {}).get("name")) or ("Chatbot Patient" if source == "chatbot" else "Unknown Patient")
-    health_card = _to_text((raw_form_data or {}).get("health_card"))
-    notes = _to_text((raw_form_data or {}).get("notes"))
+    form_data = raw_form_data or {}
+    name = _to_text(form_data.get("full_name")) or _to_text(form_data.get("name")) or ("Chatbot Patient" if source == "chatbot" else "Unknown Patient")
+    health_card = _to_text(form_data.get("health_card_number")) or _to_text(form_data.get("health_card"))
+    notes = _to_text(form_data.get("notes"))
+    age = _coerce_optional_int(form_data.get("age"))
+    gender = _to_text(form_data.get("gender"))
+    phone = _to_text(form_data.get("phone"))
+    address = _to_text(form_data.get("address"))
+    emergency_contact = _to_text(form_data.get("emergency_contact"))
     db.execute(
         text(
             """
-            INSERT INTO patients (name, p_id, health_card, notes)
-            VALUES (:name, :p_id, :health_card, :notes)
+            INSERT INTO patients (name, p_id, health_card, notes, age, gender, phone, address, emergency_contact)
+            VALUES (:name, :p_id, :health_card, :notes, :age, :gender, :phone, :address, :emergency_contact)
             """
         ),
         {
@@ -392,9 +408,13 @@ def _ensure_patient_exists(db: Session, patient_id: str, raw_form_data: Optional
             "p_id": patient_id,
             "health_card": health_card,
             "notes": notes,
+            "age": age,
+            "gender": gender,
+            "phone": phone,
+            "address": address,
+            "emergency_contact": emergency_contact,
         },
     )
-
 
 def persist_triage_result(
     db: Session,
@@ -490,6 +510,7 @@ def persist_triage_result(
                 patient_id, scenario, urgency_level, ctas_name, arrival_mode,
                 assessment_start_ts, lab_required, imaging_required, bed_assigned_type,
                 recommended_bed, bed_id, bed_status, current_location,
+                requested_service, service_requested_at,
                 estimated_wait_minutes, estimated_los_delta_minutes,
                 allocation_alerts, admit_decision, discharge_ts, waiting_time_minutes,
                 los_minutes, clinical_summary
@@ -497,6 +518,7 @@ def persist_triage_result(
                 :patient_id, :scenario, :urgency_level, :ctas_name, :arrival_mode,
                 :assessment_start_ts, :lab_required, :imaging_required, :bed_assigned_type,
                 :recommended_bed, :bed_id, :bed_status, :current_location,
+                :requested_service, :service_requested_at,
                 :estimated_wait_minutes, :estimated_los_delta_minutes,
                 :allocation_alerts, :admit_decision, :discharge_ts, :waiting_time_minutes,
                 :los_minutes, :clinical_summary
@@ -517,6 +539,8 @@ def persist_triage_result(
             "bed_id": bed_id,
             "bed_status": "occupied",
             "current_location": bed_choice,
+            "requested_service": "",
+            "service_requested_at": None,
             "estimated_wait_minutes": allocation.estimated_wait_minutes,
             "estimated_los_delta_minutes": allocation.estimated_los_delta_minutes,
             "allocation_alerts": _serialize_alerts(allocation.alerts),
@@ -765,6 +789,7 @@ def _create_cleaning_marker(db: Session, scenario_name: str, unit: str, bed_id: 
                 patient_id, scenario, urgency_level, ctas_name, arrival_mode,
                 assessment_start_ts, lab_required, imaging_required, bed_assigned_type,
                 recommended_bed, bed_id, bed_status, current_location,
+                requested_service, service_requested_at,
                 estimated_wait_minutes, estimated_los_delta_minutes,
                 allocation_alerts, admit_decision, discharge_ts, waiting_time_minutes,
                 los_minutes, clinical_summary
@@ -772,9 +797,10 @@ def _create_cleaning_marker(db: Session, scenario_name: str, unit: str, bed_id: 
                 :patient_id, :scenario, 0, '', 'system',
                 :assessment_start_ts, 0, 0, :unit,
                 :unit, :bed_id, 'cleaning', :unit,
+                '', NULL,
                 0, 0,
-                '[]', 'cleaning', NULL, 0,
-                0, :clinical_summary
+                '[]', 'cleaning', NULL,
+                0, 0, :clinical_summary
             )
             """
         ),
@@ -795,6 +821,8 @@ def discharge_patient_from_bed(db: Session, patient_id: str, scenario_name: str 
         raise ValueError("No active bed assignment was found for this patient")
 
     timestamp = _now_iso()
+    bed_id = _to_text(row.get("bed_id"))
+    bed_unit = (_to_text(row.get("recommended_bed")) or _to_text(row.get("bed_assigned_type")) or _bed_unit_from_id(bed_id)).upper()
     db.execute(
         text(
             """
@@ -807,9 +835,9 @@ def discharge_patient_from_bed(db: Session, patient_id: str, scenario_name: str 
         ),
         {"timestamp": timestamp, "row_id": int(row.get("id") or 0)},
     )
+    _create_cleaning_marker(db, scenario_name, bed_unit, bed_id)
     db.commit()
     return compute_bed_availability(db, scenario_name=scenario_name)
-
 
 def transfer_patient_to_ward(db: Session, patient_id: str, ward: str, scenario_name: str = "normal") -> BedAvailabilityResponse:
     row = _latest_active_history_row(db, patient_id, scenario_name)
@@ -819,6 +847,8 @@ def transfer_patient_to_ward(db: Session, patient_id: str, ward: str, scenario_n
         raise ValueError("A transfer ward is required")
 
     timestamp = _now_iso()
+    bed_id = _to_text(row.get("bed_id"))
+    bed_unit = (_to_text(row.get("recommended_bed")) or _to_text(row.get("bed_assigned_type")) or _bed_unit_from_id(bed_id)).upper()
     db.execute(
         text(
             """
@@ -831,9 +861,9 @@ def transfer_patient_to_ward(db: Session, patient_id: str, ward: str, scenario_n
         ),
         {"timestamp": timestamp, "ward": ward, "row_id": int(row.get("id") or 0)},
     )
+    _create_cleaning_marker(db, scenario_name, bed_unit, bed_id)
     db.commit()
     return compute_bed_availability(db, scenario_name=scenario_name)
-
 
 def complete_bed_cleaning(db: Session, bed_id: str, scenario_name: str = "normal") -> BedAvailabilityResponse:
     row = db.execute(
@@ -924,6 +954,7 @@ def fetch_bed_detail(db: Session, bed_id: str, scenario_name: str = "normal") ->
             urgency=summary.urgency,
             summary=summary.summary,
             wait_time=summary.estimated_wait_minutes,
+            requested_service=summary.requested_service,
             systolic_bp=summary.systolic_bp,
             temperature=summary.temperature,
             heart_rate=summary.heart_rate,
@@ -939,10 +970,86 @@ def fetch_bed_detail(db: Session, bed_id: str, scenario_name: str = "normal") ->
     )
 
 
-def send_patient_to_service(db: Session, patient_id: str, service: str, scenario_name: str = "normal") -> BedDetailResponse:
+def _service_duration_minutes(department: str, requested_service: str) -> float:
+    service_name = _to_text(requested_service)
+    default_service = SERVICE_CATALOG[department][0]
+    return float(SERVICE_WAIT_MINUTES[department].get(service_name, SERVICE_WAIT_MINUTES[department][default_service]))
+
+
+def _service_queue_rows(db: Session, department: str, scenario_name: str = "normal") -> List[Dict[str, Any]]:
+    rows = db.execute(
+        text(
+            """
+            SELECT
+                patient_id,
+                urgency_level,
+                ctas_name,
+                current_location,
+                requested_service,
+                clinical_summary,
+                COALESCE(service_requested_at, assessment_start_ts, created_at, '') AS queue_started_at
+            FROM patient_history
+            WHERE (:scenario = '' OR scenario = :scenario)
+              AND (discharge_ts IS NULL OR discharge_ts = '')
+              AND LOWER(COALESCE(current_location, '')) = :department
+              AND COALESCE(bed_status, 'occupied') <> 'cleaning'
+              AND patient_id NOT LIKE 'CLEANING-%'
+            ORDER BY COALESCE(urgency_level, 5) ASC, COALESCE(service_requested_at, assessment_start_ts, created_at, '') ASC, id ASC
+            """
+        ),
+        {"scenario": scenario_name, "department": department.lower()},
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+def fetch_service_queue(db: Session, department: str, scenario_name: str = "normal") -> ServiceQueueResponse:
+    department_name = _to_text(department).lower()
+    if department_name not in SERVICE_CATALOG:
+        raise ValueError("Department must be 'lab' or 'imaging'")
+
+    rows = _service_queue_rows(db, department_name, scenario_name)
+    wait_so_far = 0.0
+    items: List[ServiceQueueItem] = []
+    for row in rows:
+        requested_service = _to_text(row.get("requested_service")) or SERVICE_CATALOG[department_name][0]
+        items.append(
+            ServiceQueueItem(
+                patient_id=_to_text(row.get("patient_id")),
+                current_location=department_name,
+                requested_service=requested_service,
+                ctas_name=_to_text(row.get("ctas_name")) or f"CTAS {int(row.get('urgency_level') or 0)}",
+                urgency=_urgency_label(int(row.get("urgency_level") or 0)),
+                estimated_wait_time=round(wait_so_far, 2),
+                summary=_to_text(row.get("clinical_summary")),
+            )
+        )
+        wait_so_far += _service_duration_minutes(department_name, requested_service)
+
+    average_wait = round(sum(item.estimated_wait_time for item in items) / len(items), 2) if items else 0.0
+    return ServiceQueueResponse(
+        department=department_name,
+        queue_length=len(items),
+        average_wait_time=average_wait,
+        refreshed_at=_now_iso(),
+        available_services=SERVICE_CATALOG[department_name],
+        patients=items,
+    )
+
+
+def send_patient_to_service(
+    db: Session,
+    patient_id: str,
+    service: str,
+    requested_service: str = "",
+    scenario_name: str = "normal",
+) -> BedDetailResponse:
     service_name = _to_text(service).lower()
     if service_name not in {"lab", "imaging"}:
         raise ValueError("Service must be 'lab' or 'imaging'")
+
+    service_choice = _to_text(requested_service) or SERVICE_CATALOG[service_name][0]
+    if service_choice not in SERVICE_CATALOG[service_name]:
+        raise ValueError(f"Invalid {service_name} service type")
 
     row = _latest_active_history_row(db, patient_id, scenario_name)
     if not row:
@@ -952,11 +1059,18 @@ def send_patient_to_service(db: Session, patient_id: str, service: str, scenario
         text(
             """
             UPDATE patient_history
-            SET current_location = :service
+            SET current_location = :service,
+                requested_service = :requested_service,
+                service_requested_at = :requested_at
             WHERE id = :row_id
             """
         ),
-        {"service": service_name, "row_id": int(row.get("id") or 0)},
+        {
+            "service": service_name,
+            "requested_service": service_choice,
+            "requested_at": _now_iso(),
+            "row_id": int(row.get("id") or 0),
+        },
     )
     db.commit()
     return fetch_bed_detail(db, _to_text(row.get("bed_id")), scenario_name=scenario_name)
@@ -969,8 +1083,14 @@ def update_patient_record(
     pain_scale: Optional[int] = None,
     notes: str = "",
     nurse_vitals: Optional[Dict[str, Any]] = None,
+    identity_data: Optional[Dict[str, Any]] = None,
     scenario_name: str = "normal",
 ) -> ClinicalSummaryResponse:
+    patient = db.execute(
+        text("SELECT * FROM patients WHERE p_id = :p_id ORDER BY id DESC LIMIT 1"),
+        {"p_id": patient_id},
+    ).mappings().first() or {}
+
     triage = db.execute(
         text("SELECT * FROM triage_a WHERE p_id = :p_id ORDER BY id DESC LIMIT 1"),
         {"p_id": patient_id},
@@ -998,6 +1118,11 @@ def update_patient_record(
     if pain_scale is not None:
         merged_payload["pain_score"] = pain_scale
 
+    identity_payload = identity_data or {}
+    resolved_age = _coerce_optional_int(identity_payload.get("age")) if identity_payload.get("age") is not None else (_coerce_optional_int(patient.get("age")) if patient.get("age") is not None else clinical_data.age)
+    if resolved_age is not None:
+        merged_payload["age"] = resolved_age
+
     vitals_payload = nurse_vitals or {}
     for field_name in VITAL_FIELDS:
         if vitals_payload.get(field_name) is not None:
@@ -1009,10 +1134,24 @@ def update_patient_record(
     else:
         updated_clinical_data.summary = _build_finalized_summary(updated_clinical_data)
 
+    resolved_name = _to_text(identity_payload.get("full_name")) or _to_text(patient.get("name")) or "Unknown Patient"
+    resolved_gender = _to_text(identity_payload.get("gender")) or _to_text(patient.get("gender")) or _to_text(triage.get("gender"))
+    resolved_phone = _to_text(identity_payload.get("phone")) if "phone" in identity_payload else _to_text(patient.get("phone"))
+    resolved_address = _to_text(identity_payload.get("address")) if "address" in identity_payload else _to_text(patient.get("address"))
+    resolved_health_card = _to_text(identity_payload.get("health_card_number")) if "health_card_number" in identity_payload else _to_text(patient.get("health_card"))
+    resolved_emergency_contact = _to_text(identity_payload.get("emergency_contact")) if "emergency_contact" in identity_payload else _to_text(patient.get("emergency_contact"))
+
     raw_form_data = {
         "arrival_time": triage.get("arrival_time"),
         "age": updated_clinical_data.age,
-        "gender": triage.get("gender"),
+        "gender": resolved_gender,
+        "full_name": resolved_name,
+        "name": resolved_name,
+        "phone": resolved_phone,
+        "address": resolved_address,
+        "health_card_number": resolved_health_card,
+        "health_card": resolved_health_card,
+        "emergency_contact": resolved_emergency_contact,
         "presenting_complaint_Main_Concern": updated_clinical_data.primary_complaint,
         "symptom_location": triage.get("symptom_location"),
         "symptom_onset": triage.get("symptom_onset"),
@@ -1043,11 +1182,28 @@ def update_patient_record(
         text(
             """
             UPDATE patients
-            SET notes = :notes
+            SET name = :name,
+                health_card = :health_card,
+                notes = :notes,
+                age = :age,
+                gender = :gender,
+                phone = :phone,
+                address = :address,
+                emergency_contact = :emergency_contact
             WHERE p_id = :p_id
             """
         ),
-        {"notes": notes, "p_id": patient_id},
+        {
+            "name": resolved_name,
+            "health_card": resolved_health_card,
+            "notes": notes,
+            "age": updated_clinical_data.age,
+            "gender": resolved_gender,
+            "phone": resolved_phone,
+            "address": resolved_address,
+            "emergency_contact": resolved_emergency_contact,
+            "p_id": patient_id,
+        },
     )
 
     pipeline = run_triage_pipeline(
@@ -1063,7 +1219,6 @@ def update_patient_record(
         _archive_previous_active_patient_rows(db, patient_id, int(latest_row.get("id") or 0))
 
     return fetch_clinical_summary(db, pipeline.patient_id)
-
 
 def compute_live_metrics(db: Session, scenario_name: str = "normal") -> MetricsResponse:
     scenario = get_scenario(scenario_name)
@@ -1082,7 +1237,6 @@ def compute_live_metrics(db: Session, scenario_name: str = "normal") -> MetricsR
                 discharge_ts
             FROM patient_history
             WHERE (:scenario = '' OR scenario = :scenario)
-              AND COALESCE(bed_status, 'occupied') <> 'cleaning'
             ORDER BY id DESC
             LIMIT 500
             """
@@ -1091,7 +1245,8 @@ def compute_live_metrics(db: Session, scenario_name: str = "normal") -> MetricsR
     ).mappings().all()
 
     active_rows = [row for row in rows if not _to_text(row.get("discharge_ts"))]
-    relevant_rows = active_rows or rows
+    active_patient_rows = [row for row in active_rows if (_to_text(row.get("bed_status")) or "occupied").lower() != "cleaning"]
+    relevant_rows = active_patient_rows or [row for row in rows if (_to_text(row.get("bed_status")) or "occupied").lower() != "cleaning"]
     if not relevant_rows:
         return MetricsResponse(
             average_waiting_time=0.0,
@@ -1118,8 +1273,8 @@ def compute_live_metrics(db: Session, scenario_name: str = "normal") -> MetricsR
         elif bed_type == "ED":
             ed_count += 1
 
-    high_urgency_count = sum(1 for row in active_rows if int(row.get("urgency_level") or 0) in (1, 2))
-    queue_length = len(active_rows)
+    high_urgency_count = sum(1 for row in active_patient_rows if int(row.get("urgency_level") or 0) in (1, 2))
+    queue_length = len(active_patient_rows)
 
     return MetricsResponse(
         average_waiting_time=round(sum(wait_values) / len(wait_values), 2),
@@ -1129,7 +1284,6 @@ def compute_live_metrics(db: Session, scenario_name: str = "normal") -> MetricsR
         queue_length=queue_length,
         high_urgency_count=high_urgency_count,
     )
-
 
 def fetch_patient_history(db: Session, limit: int = 20, scenario_name: str = "") -> List[PatientHistoryItem]:
     rows = db.execute(
@@ -1149,6 +1303,7 @@ def fetch_patient_history(db: Session, limit: int = 20, scenario_name: str = "")
                 COALESCE(bed_id, '') AS bed_id,
                 COALESCE(bed_status, 'occupied') AS bed_status,
                 COALESCE(current_location, '') AS current_location,
+                COALESCE(requested_service, '') AS requested_service,
                 COALESCE(estimated_wait_minutes, 0) AS estimated_wait_minutes,
                 COALESCE(estimated_los_delta_minutes, 0) AS estimated_los_delta_minutes,
                 COALESCE(allocation_alerts, '') AS allocation_alerts,
@@ -1182,6 +1337,7 @@ def fetch_patient_history(db: Session, limit: int = 20, scenario_name: str = "")
             bed_id=_to_text(row.get("bed_id")),
             bed_status=_to_text(row.get("bed_status")) or "occupied",
             current_location=_to_text(row.get("current_location")),
+            requested_service=_to_text(row.get("requested_service")),
             estimated_wait_minutes=float(row.get("estimated_wait_minutes") or 0.0),
             estimated_los_delta_minutes=float(row.get("estimated_los_delta_minutes") or 0.0),
             allocation_alerts=_deserialize_alerts(row.get("allocation_alerts")),
@@ -1216,7 +1372,7 @@ def _parse_clinical_json(raw_value: Any) -> Dict[str, Any]:
 
 def fetch_clinical_summary(db: Session, patient_id: str) -> ClinicalSummaryResponse:
     patient = db.execute(
-        text("SELECT name, notes FROM patients WHERE p_id = :p_id ORDER BY id DESC LIMIT 1"),
+        text("SELECT name, notes, age, gender, phone, address, health_card, emergency_contact FROM patients WHERE p_id = :p_id ORDER BY id DESC LIMIT 1"),
         {"p_id": patient_id},
     ).mappings().first() or {}
 
@@ -1241,9 +1397,14 @@ def fetch_clinical_summary(db: Session, patient_id: str) -> ClinicalSummaryRespo
     return ClinicalSummaryResponse(
         patient_id=patient_id,
         name=_to_text(patient.get("name")) or "Unknown",
+        full_name=_to_text(patient.get("name")) or "Unknown",
+        health_card_number=_to_text(patient.get("health_card")),
+        phone=_to_text(patient.get("phone")),
+        address=_to_text(patient.get("address")),
+        emergency_contact=_to_text(patient.get("emergency_contact")),
         notes=_to_text(patient.get("notes")),
-        age=_coerce_optional_int(triage.get("age")) if triage.get("age") is not None else clinical_data.age,
-        gender=_to_text(triage.get("gender")),
+        age=_coerce_optional_int(patient.get("age")) if patient.get("age") is not None else (_coerce_optional_int(triage.get("age")) if triage.get("age") is not None else clinical_data.age),
+        gender=_to_text(patient.get("gender")) or _to_text(triage.get("gender")),
         arrival_time=_to_text(triage.get("arrival_time")),
         chief_complaint=_to_text(triage.get("presenting_complaint_Main_Concern")) or clinical_data.primary_complaint,
         location=_to_text(triage.get("symptom_location")),
@@ -1281,12 +1442,12 @@ def fetch_clinical_summary(db: Session, patient_id: str) -> ClinicalSummaryRespo
         missing_vitals=scored.missing_vitals,
         recommended_bed=_to_text(history.get("recommended_bed")) or _to_text(history.get("bed_assigned_type")),
         current_location=_to_text(history.get("current_location")) or _to_text(history.get("recommended_bed")) or _to_text(history.get("bed_assigned_type")),
+        requested_service=_to_text(history.get("requested_service")),
         estimated_wait_minutes=float(history.get("estimated_wait_minutes") or 0.0),
         estimated_los_delta_minutes=float(history.get("estimated_los_delta_minutes") or 0.0),
         allocation_alerts=_deserialize_alerts(history.get("allocation_alerts")),
         summary=_to_text(history.get("clinical_summary")) or _to_text(triage.get("clinical_summary")),
     )
-
 
 def _load_bed_rows(db: Session, scenario_name: str) -> List[Dict[str, Any]]:
     rows = db.execute(
@@ -1301,6 +1462,7 @@ def _load_bed_rows(db: Session, scenario_name: str) -> List[Dict[str, Any]]:
                 COALESCE(bed_id, '') AS bed_id,
                 COALESCE(bed_status, 'occupied') AS bed_status,
                 COALESCE(current_location, '') AS current_location,
+                COALESCE(requested_service, '') AS requested_service,
                 COALESCE(estimated_wait_minutes, 0) AS estimated_wait_minutes,
                 COALESCE(allocation_alerts, '') AS allocation_alerts
             FROM patient_history

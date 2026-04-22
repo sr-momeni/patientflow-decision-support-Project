@@ -64,6 +64,12 @@ const BedAssignments = () => {
           <div className="nav-item active">
             <span style={{ marginRight: "12px" }}>Bed</span> Assignments
           </div>
+          <div className="nav-item" onClick={() => navigate("/lab")}>
+            <span style={{ marginRight: "12px" }}>Lab</span> Lab
+          </div>
+          <div className="nav-item" onClick={() => navigate("/imaging")}>
+            <span style={{ marginRight: "12px" }}>Img</span> Imaging
+          </div>
           <a className="nav-item" href={chatbotUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
             <span style={{ marginRight: "12px" }}>AI</span> Triage Agent
           </a>
