@@ -52,8 +52,6 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-patient" element={<Newpatient />} />
         <Route path="/triage-form" element={<TriageForm />} />
-        <Route path="/triage-form-2" element={<TriageForm2 />} />
-        <Route path="/triage-form-3" element={<TriageForm3 />} />
         <Route path="/clinical/:p_id" element={<ClinicalSummary />} />
         <Route path="/bed-assignments" element={<BedAssignments />} />
         <Route path="/bed/:bed_id" element={<BedDetail />} />

@@ -1,0 +1,18 @@
+{
+  "primary_complaint": "abdominal pain",
+  "pain_score": 6,
+  "consciousness": "alert",
+  "spo2": 98.0,
+  "heart_rate": 85,
+  "systolic_bp": 130,
+  "respiratory_rate": 18,
+  "temperature": 37.2,
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "resp_distress": "none",
+  "age": 45,
+  "history": [
+    "chronic_disease"
+  ],
+  "summary": "The patient is presenting with moderate abdominal pain (score 6) but is stable and alert."
+}

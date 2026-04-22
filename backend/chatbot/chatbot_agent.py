@@ -238,6 +238,7 @@ class TriageChatbotAgent:
 
     def __init__(self):
         self.scorer = UrgencyScoringAgent()
+        self.sim_manager = RealTimeSimulationManager()
 
     def chat(
         self,
@@ -307,6 +308,9 @@ class TriageChatbotAgent:
         color = CTAS_COLORS.get(ctas_level, "#7f8c8d")
         reason = build_triage_reason(clinical_data, ctas_level)
 
+        # Run the real-time simulation allocation
+        sim_result = self.sim_manager.process_new_patient(ctas_level)
+        
         result = {
             "ctas_level": ctas_level,
             "ctas_name": name,
