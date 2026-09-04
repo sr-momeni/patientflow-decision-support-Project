@@ -48,6 +48,8 @@ const DashboardPage = () => {
     queue_length: 0,
     high_urgency_count: 0,
   });
+  const [labQueue, setLabQueue] = useState({ queue_length: 0, average_wait_time: 0 });
+  const [imagingQueue, setImagingQueue] = useState({ queue_length: 0, average_wait_time: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -58,15 +60,19 @@ const DashboardPage = () => {
       setLoading(true);
       setError("");
       try {
-        const [metricsResponse, historyResponse] = await Promise.all([
+        const [metricsResponse, historyResponse, labResponse, imagingResponse] = await Promise.all([
           apiGet("/metrics"),
           apiGet("/patient-history?limit=25"),
+          apiGet("/lab-queue"),
+          apiGet("/imaging-queue"),
         ]);
         if (!mounted) {
           return;
         }
         setMetrics(metricsResponse);
         setHistory(Array.isArray(historyResponse) ? historyResponse : []);
+        setLabQueue(labResponse || { queue_length: 0, average_wait_time: 0 });
+        setImagingQueue(imagingResponse || { queue_length: 0, average_wait_time: 0 });
       } catch (loadError) {
         if (!mounted) {
           return;
@@ -118,6 +124,12 @@ const DashboardPage = () => {
           <div className="nav-item" onClick={() => navigate("/bed-assignments")}>
             <span style={{ marginRight: "12px" }}>Bed</span> Assignments
           </div>
+          <div className="nav-item" onClick={() => navigate("/lab")}>
+            <span style={{ marginRight: "12px" }}>Lab</span> Lab
+          </div>
+          <div className="nav-item" onClick={() => navigate("/imaging")}>
+            <span style={{ marginRight: "12px" }}>Img</span> Imaging
+          </div>
           <a className="nav-item" href={chatbotUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
             <span style={{ marginRight: "12px" }}>AI</span> Triage Agent
           </a>
@@ -133,7 +145,7 @@ const DashboardPage = () => {
 
         <div className="welcome-banner">
           <h1>Hello {userEmail === "testuser@hospital.com" ? "Dr. White" : userEmail.split("@")[0]}</h1>
-          <p>Live metrics are now coming from the unified FastAPI backend.</p>
+          <p>Live metrics now include triage, allocation, bed flow, and downstream Lab / Imaging queue status.</p>
         </div>
 
         {error ? <div style={{ color: "#EE5D50", marginBottom: "16px" }}>Dashboard load failed: {error}</div> : null}
@@ -141,30 +153,14 @@ const DashboardPage = () => {
         <div className="dashboard-grid-layout">
           <div className="stats-table-column">
             <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-header"><span>Queue Length</span></div>
-                <div className="stat-body"><p>{metrics.queue_length}</p></div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-header"><span>High Urgency</span></div>
-                <div className="stat-body"><p style={{ color: "#EE5D50" }}>{metrics.high_urgency_count}</p></div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-header"><span>Average Wait</span></div>
-                <div className="stat-body"><p>{formatMinutes(metrics.average_waiting_time)}</p></div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-header"><span>Average LOS</span></div>
-                <div className="stat-body"><p>{formatMinutes(metrics.average_los)}</p></div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-header"><span>ED Utilization</span></div>
-                <div className="stat-body"><p>{formatPercent(metrics.ed_bed_utilization)}</p></div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-header"><span>ICU Utilization</span></div>
-                <div className="stat-body"><p>{formatPercent(metrics.icu_bed_utilization)}</p></div>
-              </div>
+              <div className="stat-card"><div className="stat-header"><span>Queue Length</span></div><div className="stat-body"><p>{metrics.queue_length}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>High Urgency</span></div><div className="stat-body"><p style={{ color: "#EE5D50" }}>{metrics.high_urgency_count}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>Average Wait</span></div><div className="stat-body"><p>{formatMinutes(metrics.average_waiting_time)}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>Average LOS</span></div><div className="stat-body"><p>{formatMinutes(metrics.average_los)}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>ED Utilization</span></div><div className="stat-body"><p>{formatPercent(metrics.ed_bed_utilization)}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>ICU Utilization</span></div><div className="stat-body"><p>{formatPercent(metrics.icu_bed_utilization)}</p></div></div>
+              <div className="stat-card"><div className="stat-header"><span>Lab Queue</span></div><div className="stat-body"><p>{labQueue.queue_length}</p><small style={{ color: "#707EAE" }}>Avg {formatMinutes(labQueue.average_wait_time)}</small></div></div>
+              <div className="stat-card"><div className="stat-header"><span>Imaging Queue</span></div><div className="stat-body"><p>{imagingQueue.queue_length}</p><small style={{ color: "#707EAE" }}>Avg {formatMinutes(imagingQueue.average_wait_time)}</small></div></div>
             </div>
 
             <div className="patient-table-container">
@@ -178,6 +174,7 @@ const DashboardPage = () => {
                     <th>CTAS</th>
                     <th>Scenario</th>
                     <th>Recommended Bed</th>
+                    <th>Location</th>
                     <th>Wait</th>
                     <th>LOS</th>
                     <th>Alerts</th>
@@ -187,7 +184,7 @@ const DashboardPage = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: "center" }}>Loading dashboard...</td>
+                      <td colSpan="9" style={{ textAlign: "center" }}>Loading dashboard...</td>
                     </tr>
                   ) : history.length > 0 ? (
                     history.map((item) => (
@@ -206,6 +203,7 @@ const DashboardPage = () => {
                         </td>
                         <td>{item.scenario}</td>
                         <td>{item.recommended_bed || item.bed_assigned_type || "ED"}</td>
+                        <td style={{ textTransform: "capitalize" }}>{item.current_location || "-"}</td>
                         <td>{formatMinutes(item.estimated_wait_minutes)}</td>
                         <td>{formatMinutes(item.los_minutes || item.estimated_los_delta_minutes)}</td>
                         <td>{item.allocation_alerts?.length ? item.allocation_alerts.join(", ") : "-"}</td>
@@ -218,7 +216,7 @@ const DashboardPage = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: "center" }}>No patient history available yet.</td>
+                      <td colSpan="9" style={{ textAlign: "center" }}>No patient history available yet.</td>
                     </tr>
                   )}
                 </tbody>
@@ -229,50 +227,24 @@ const DashboardPage = () => {
           <div className="ai-panel">
             <h3>AI Resource Allocation</h3>
             <p className="ai-subtext"><b>Live operational summary</b></p>
-            <div className="ai-stat-row">
-              <span>Queue Length</span>
-              <span className="val">{metrics.queue_length}</span>
-            </div>
-            <div className="ai-stat-row">
-              <span>High Urgency</span>
-              <span className="val" style={{ color: "#EE5D50" }}>{metrics.high_urgency_count}</span>
-            </div>
-            <div className="ai-stat-row">
-              <span>Average Wait Time</span>
-              <span className="val">{formatMinutes(metrics.average_waiting_time)}</span>
-            </div>
-            <div className="ai-stat-row">
-              <span>ED Utilization</span>
-              <span className="val">{formatPercent(metrics.ed_bed_utilization)}</span>
-            </div>
-            <div className="ai-stat-row">
-              <span>ICU Utilization</span>
-              <span className="val">{formatPercent(metrics.icu_bed_utilization)}</span>
-            </div>
+            <div className="ai-stat-row"><span>Queue Length</span><span className="val">{metrics.queue_length}</span></div>
+            <div className="ai-stat-row"><span>High Urgency</span><span className="val" style={{ color: "#EE5D50" }}>{metrics.high_urgency_count}</span></div>
+            <div className="ai-stat-row"><span>Average Wait Time</span><span className="val">{formatMinutes(metrics.average_waiting_time)}</span></div>
+            <div className="ai-stat-row"><span>ED Utilization</span><span className="val">{formatPercent(metrics.ed_bed_utilization)}</span></div>
+            <div className="ai-stat-row"><span>ICU Utilization</span><span className="val">{formatPercent(metrics.icu_bed_utilization)}</span></div>
+            <div className="ai-stat-row"><span>Lab Queue</span><span className="val">{labQueue.queue_length} / {formatMinutes(labQueue.average_wait_time)}</span></div>
+            <div className="ai-stat-row"><span>Imaging Queue</span><span className="val">{imagingQueue.queue_length} / {formatMinutes(imagingQueue.average_wait_time)}</span></div>
 
             <div className="ai-card critical">
               <h4>{latestRecommendation ? `Latest prioritization output for ${latestRecommendation.patient_id}` : "No live recommendation yet"}</h4>
               <p>{recommendationSummary(latestRecommendation)}</p>
               {latestRecommendation ? (
                 <>
-                  <div className="ai-stat-row">
-                    <span>CTAS / Urgency</span>
-                    <span className="val" style={{ color: latestRecommendation.urgency_level <= 2 ? "#EE5D50" : latestRecommendation.urgency_level === 3 ? "#4318FF" : "#05CD99" }}>
-                      {latestRecommendation.ctas_name || `CTAS ${latestRecommendation.urgency_level}`}
-                    </span>
-                  </div>
-                  <div className="ai-stat-row">
-                    <span>Recommended Bed</span>
-                    <span className="val">{latestRecommendation.recommended_bed || latestRecommendation.bed_assigned_type || "ED"}</span>
-                  </div>
-                  <div className="ai-stat-row">
-                    <span>Estimated Wait</span>
-                    <span className="val">{formatMinutes(latestRecommendation.estimated_wait_minutes)}</span>
-                  </div>
-                  <div className="ai-stat-row">
-                    <span>Alerts</span>
-                    <span className="val">{latestRecommendation.allocation_alerts?.length ? latestRecommendation.allocation_alerts.join(", ") : "None"}</span>
-                  </div>
+                  <div className="ai-stat-row"><span>CTAS / Urgency</span><span className="val" style={{ color: latestRecommendation.urgency_level <= 2 ? "#EE5D50" : latestRecommendation.urgency_level === 3 ? "#4318FF" : "#05CD99" }}>{latestRecommendation.ctas_name || `CTAS ${latestRecommendation.urgency_level}`}</span></div>
+                  <div className="ai-stat-row"><span>Recommended Bed</span><span className="val">{latestRecommendation.recommended_bed || latestRecommendation.bed_assigned_type || "ED"}</span></div>
+                  <div className="ai-stat-row"><span>Current Location</span><span className="val" style={{ textTransform: "capitalize" }}>{latestRecommendation.current_location || latestRecommendation.recommended_bed || "ED"}</span></div>
+                  <div className="ai-stat-row"><span>Estimated Wait</span><span className="val">{formatMinutes(latestRecommendation.estimated_wait_minutes)}</span></div>
+                  <div className="ai-stat-row"><span>Alerts</span><span className="val">{latestRecommendation.allocation_alerts?.length ? latestRecommendation.allocation_alerts.join(", ") : "None"}</span></div>
                   {latestRecommendation.clinical_summary ? <p>{latestRecommendation.clinical_summary}</p> : null}
                 </>
               ) : null}
@@ -281,6 +253,12 @@ const DashboardPage = () => {
               </button>
               <button className="execute-btn" onClick={() => navigate("/bed-assignments")} style={{ marginTop: "8px", background: "#05CD99" }}>
                 View bed assignments
+              </button>
+              <button className="execute-btn" onClick={() => navigate("/lab")} style={{ marginTop: "8px", background: "#4318FF" }}>
+                Open Lab queue
+              </button>
+              <button className="execute-btn" onClick={() => navigate("/imaging")} style={{ marginTop: "8px", background: "#0095FF" }}>
+                Open Imaging queue
               </button>
             </div>
           </div>

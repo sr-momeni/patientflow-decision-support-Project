@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List
 
@@ -26,6 +26,7 @@ from backend.api.schemas import (
     PatientHistoryItem,
     PatientServiceRequest,
     PatientUpdateRequest,
+    ServiceQueueResponse,
     ScoringRequest,
     SignupRequest,
     TriagePipelineResponse,
@@ -39,6 +40,7 @@ from backend.api.services import (
     fetch_bed_detail,
     fetch_clinical_summary,
     fetch_patient_history,
+    fetch_service_queue,
     finalize_nurse_evaluation,
     normalize_manual_triage_payload,
     run_triage_pipeline,
@@ -61,6 +63,9 @@ def add_patient(patient: PatientCreate, db: Session = Depends(get_db)) -> Dict[s
             {"p_id": patient.p_id},
         ).mappings().first()
 
+        resolved_name = (patient.full_name or patient.name or "").strip()
+        resolved_health_card = (patient.health_card_number or patient.health_card or "").strip()
+
         if existing:
             db.execute(
                 text(
@@ -68,30 +73,45 @@ def add_patient(patient: PatientCreate, db: Session = Depends(get_db)) -> Dict[s
                     UPDATE patients
                     SET name = :name,
                         health_card = :health_card,
-                        notes = :notes
+                        notes = :notes,
+                        age = :age,
+                        gender = :gender,
+                        phone = :phone,
+                        address = :address,
+                        emergency_contact = :emergency_contact
                     WHERE p_id = :p_id
                     """
                 ),
                 {
-                    "name": patient.name,
+                    "name": resolved_name,
                     "p_id": patient.p_id,
-                    "health_card": patient.health_card,
+                    "health_card": resolved_health_card,
                     "notes": patient.notes,
+                    "age": patient.age,
+                    "gender": patient.gender,
+                    "phone": patient.phone,
+                    "address": patient.address,
+                    "emergency_contact": patient.emergency_contact,
                 },
             )
         else:
             db.execute(
                 text(
                     """
-                    INSERT INTO patients (name, p_id, health_card, notes)
-                    VALUES (:name, :p_id, :health_card, :notes)
+                    INSERT INTO patients (name, p_id, health_card, notes, age, gender, phone, address, emergency_contact)
+                    VALUES (:name, :p_id, :health_card, :notes, :age, :gender, :phone, :address, :emergency_contact)
                     """
                 ),
                 {
-                    "name": patient.name,
+                    "name": resolved_name,
                     "p_id": patient.p_id,
-                    "health_card": patient.health_card,
+                    "health_card": resolved_health_card,
                     "notes": patient.notes,
+                    "age": patient.age,
+                    "gender": patient.gender,
+                    "phone": patient.phone,
+                    "address": patient.address,
+                    "emergency_contact": patient.emergency_contact,
                 },
             )
         db.commit()
@@ -247,6 +267,22 @@ def bed_availability(scenario: str = Query(default="normal"), db: Session = Depe
         raise HTTPException(status_code=500, detail=f"Failed to fetch bed availability: {exc}")
 
 
+@router.get("/lab-queue", response_model=ServiceQueueResponse)
+def lab_queue(scenario: str = Query(default="normal"), db: Session = Depends(get_db)) -> ServiceQueueResponse:
+    try:
+        return fetch_service_queue(db, department="lab", scenario_name=scenario)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch lab queue: {exc}")
+
+
+@router.get("/imaging-queue", response_model=ServiceQueueResponse)
+def imaging_queue(scenario: str = Query(default="normal"), db: Session = Depends(get_db)) -> ServiceQueueResponse:
+    try:
+        return fetch_service_queue(db, department="imaging", scenario_name=scenario)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch imaging queue: {exc}")
+
+
 @router.get("/beds/{bed_id}", response_model=BedDetailResponse)
 def bed_detail(bed_id: str, scenario: str = Query(default="normal"), db: Session = Depends(get_db)) -> BedDetailResponse:
     try:
@@ -296,7 +332,13 @@ def bed_cleaning_complete(request: BedCleaningCompleteRequest, db: Session = Dep
 @router.post("/patient/send-to-service", response_model=BedDetailResponse)
 def patient_send_to_service(request: PatientServiceRequest, db: Session = Depends(get_db)) -> BedDetailResponse:
     try:
-        return send_patient_to_service(db, patient_id=request.p_id, service=request.service, scenario_name=request.scenario)
+        return send_patient_to_service(
+            db,
+            patient_id=request.p_id,
+            service=request.service,
+            requested_service=request.requested_service,
+            scenario_name=request.scenario,
+        )
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(exc))
@@ -315,6 +357,15 @@ def patient_update(request: PatientUpdateRequest, db: Session = Depends(get_db))
             pain_scale=request.pain_scale,
             notes=request.notes,
             nurse_vitals=request.nurse_vitals.model_dump(),
+            identity_data={
+                "full_name": request.full_name,
+                "age": request.age,
+                "gender": request.gender,
+                "phone": request.phone,
+                "address": request.address,
+                "health_card_number": request.health_card_number,
+                "emergency_contact": request.emergency_contact,
+            },
             scenario_name=request.scenario,
         )
     except ValueError as exc:

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from typing import Dict, Generator
@@ -43,6 +43,11 @@ def _sqlite_create_statements() -> Dict[str, str]:
                 p_id TEXT NOT NULL UNIQUE,
                 health_card TEXT,
                 notes TEXT,
+                age INTEGER,
+                gender TEXT,
+                phone TEXT,
+                address TEXT,
+                emergency_contact TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """,
@@ -98,6 +103,8 @@ def _sqlite_create_statements() -> Dict[str, str]:
                 bed_id TEXT,
                 bed_status TEXT,
                 current_location TEXT,
+                requested_service TEXT,
+                service_requested_at TEXT,
                 estimated_wait_minutes REAL DEFAULT 0,
                 estimated_los_delta_minutes REAL DEFAULT 0,
                 allocation_alerts TEXT,
@@ -130,6 +137,11 @@ def _mysql_create_statements() -> Dict[str, str]:
                 p_id VARCHAR(255) NOT NULL UNIQUE,
                 health_card TEXT,
                 notes TEXT,
+                age INTEGER,
+                gender TEXT,
+                phone TEXT,
+                address TEXT,
+                emergency_contact TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """,
@@ -185,6 +197,8 @@ def _mysql_create_statements() -> Dict[str, str]:
                 bed_id TEXT,
                 bed_status TEXT,
                 current_location TEXT,
+                requested_service TEXT,
+                service_requested_at TEXT,
                 estimated_wait_minutes FLOAT DEFAULT 0,
                 estimated_los_delta_minutes FLOAT DEFAULT 0,
                 allocation_alerts LONGTEXT,
@@ -206,6 +220,7 @@ def _column_definitions(backend_name: str) -> Dict[str, Dict[str, str]]:
     long_text = "TEXT" if backend_name == "sqlite" else "LONGTEXT"
     timestamp = "TEXT DEFAULT CURRENT_TIMESTAMP" if backend_name == "sqlite" else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     integer = "INTEGER DEFAULT 0"
+    nullable_integer = "INTEGER"
     return {
         "users": {
             "role": text_type,
@@ -218,6 +233,11 @@ def _column_definitions(backend_name: str) -> Dict[str, Dict[str, str]]:
             "p_id": text_type,
             "health_card": text_type,
             "notes": text_type,
+            "age": nullable_integer,
+            "gender": text_type,
+            "phone": text_type,
+            "address": text_type,
+            "emergency_contact": text_type,
             "created_at": timestamp,
         },
         "triage_a": {
@@ -265,6 +285,8 @@ def _column_definitions(backend_name: str) -> Dict[str, Dict[str, str]]:
             "bed_id": text_type,
             "bed_status": text_type,
             "current_location": text_type,
+            "requested_service": text_type,
+            "service_requested_at": text_type,
             "estimated_wait_minutes": f"{real_type} DEFAULT 0",
             "estimated_los_delta_minutes": f"{real_type} DEFAULT 0",
             "allocation_alerts": long_text,

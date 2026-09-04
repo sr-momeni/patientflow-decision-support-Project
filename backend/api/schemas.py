@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
@@ -22,10 +22,17 @@ class SignupRequest(APIModel):
 
 
 class PatientCreate(APIModel):
-    name: str
+    name: str = ""
+    full_name: str = ""
     p_id: str
-    health_card: str
+    health_card: str = ""
+    health_card_number: str = ""
     notes: str = ""
+    age: Optional[int] = None
+    gender: str = ""
+    phone: str = ""
+    address: str = ""
+    emergency_contact: str = ""
 
 
 class NurseVitals(APIModel):
@@ -102,6 +109,7 @@ class AllocationRequest(APIModel):
 class AllocationResponse(APIModel):
     recommended_bed: str
     current_location: str = ""
+    requested_service: str = ""
     estimated_wait_minutes: float
     estimated_los_delta_minutes: float
     alerts: List[str] = Field(default_factory=list)
@@ -149,6 +157,7 @@ class PatientHistoryItem(APIModel):
     bed_id: str = ""
     bed_status: str = "occupied"
     current_location: str = ""
+    requested_service: str = ""
     estimated_wait_minutes: float
     estimated_los_delta_minutes: float
     allocation_alerts: List[str] = Field(default_factory=list)
@@ -166,6 +175,11 @@ class ScoringRequest(APIModel):
 class ClinicalSummaryResponse(APIModel):
     patient_id: str
     name: str
+    full_name: str = ""
+    health_card_number: str = ""
+    phone: str = ""
+    address: str = ""
+    emergency_contact: str = ""
     notes: str
     age: Optional[int]
     gender: str
@@ -206,6 +220,7 @@ class ClinicalSummaryResponse(APIModel):
     missing_vitals: List[str] = Field(default_factory=list)
     recommended_bed: str
     current_location: str = ""
+    requested_service: str = ""
     estimated_wait_minutes: float
     estimated_los_delta_minutes: float
     allocation_alerts: List[str] = Field(default_factory=list)
@@ -250,6 +265,7 @@ class BedPatientInfo(APIModel):
     urgency: str
     summary: str = ""
     wait_time: float = 0.0
+    requested_service: str = ""
     systolic_bp: Optional[int] = None
     temperature: Optional[float] = None
     heart_rate: Optional[int] = None
@@ -267,16 +283,25 @@ class BedDetailResponse(APIModel):
 class PatientServiceRequest(APIModel):
     p_id: str
     service: Literal["lab", "imaging"]
+    requested_service: str = ""
     scenario: str = "normal"
 
 
 class PatientUpdateRequest(APIModel):
     p_id: str
     scenario: str = "normal"
+    full_name: str = ""
+    age: Optional[int] = None
+    gender: str = ""
+    phone: str = ""
+    address: str = ""
+    health_card_number: str = ""
+    emergency_contact: str = ""
     symptoms: str = ""
     pain_scale: Optional[int] = None
     notes: str = ""
     nurse_vitals: NurseVitals = Field(default_factory=NurseVitals)
+
 
 class BedDischargeRequest(APIModel):
     patient_id: str
@@ -292,3 +317,22 @@ class BedTransferRequest(APIModel):
 class BedCleaningCompleteRequest(APIModel):
     bed_id: str
     scenario: str = "normal"
+
+
+class ServiceQueueItem(APIModel):
+    patient_id: str
+    current_location: str
+    requested_service: str
+    ctas_name: str
+    urgency: str
+    estimated_wait_time: float
+    summary: str = ""
+
+
+class ServiceQueueResponse(APIModel):
+    department: Literal["lab", "imaging"]
+    queue_length: int
+    average_wait_time: float
+    refreshed_at: str
+    available_services: List[str] = Field(default_factory=list)
+    patients: List[ServiceQueueItem] = Field(default_factory=list)

@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./Dashboard.css";
 import ehosp from "./assets/ehosp.png";
 import { apiGet, apiPost, apiUrl } from "./api";
+import { IMAGING_SERVICES, LAB_SERVICES } from "./serviceCatalog";
 
 const VITAL_FIELDS = [
   { key: "systolic_bp", label: "Systolic BP", type: "number", placeholder: "e.g. 118" },
@@ -37,42 +38,40 @@ const TriageFinalize = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [routeNotice, setRouteNotice] = useState("");
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [labService, setLabService] = useState(LAB_SERVICES[0]);
+  const [imagingService, setImagingService] = useState(IMAGING_SERVICES[0]);
 
   const chatbotUrl = useMemo(() => {
     const returnUrl = encodeURIComponent(`${window.location.origin}/triage-finalize/${p_id}`);
     return `${apiUrl("/chatbot/ui")}?v=chatbot-text-ui-20260324&returnUrl=${returnUrl}`;
   }, [p_id]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const loadSummary = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const response = await apiGet(`/clinical/${p_id}`);
-        if (!mounted) return;
-        setSummaryData(response);
-        setFormData((current) => ({
-          ...current,
-          systolic_bp: response?.systolic_bp ?? "",
-          temperature: response?.temperature ?? "",
-          heart_rate: response?.heart_rate ?? "",
-          spo2: response?.spo2 ?? "",
-          respiratory_rate: response?.respiratory_rate ?? "",
-        }));
-      } catch (fetchError) {
-        if (mounted) setError(fetchError.message);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    loadSummary();
-    return () => {
-      mounted = false;
-    };
+  const loadSummary = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await apiGet(`/clinical/${p_id}`);
+      setSummaryData(response);
+      setFormData((current) => ({
+        ...current,
+        systolic_bp: response?.systolic_bp ?? "",
+        temperature: response?.temperature ?? "",
+        heart_rate: response?.heart_rate ?? "",
+        spo2: response?.spo2 ?? "",
+        respiratory_rate: response?.respiratory_rate ?? "",
+      }));
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
   }, [p_id]);
+
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -85,10 +84,12 @@ const TriageFinalize = () => {
   };
 
   const providedVitals = VITAL_FIELDS.filter(({ key }) => String(formData[key] ?? "").trim()).length;
+  const canRouteToService = Boolean(finalResult || (summaryData && !summaryData.preliminary));
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
+    setRouteNotice("");
     try {
       const result = await apiPost("/triage-finalize", {
         patient_id: p_id,
@@ -103,12 +104,31 @@ const TriageFinalize = () => {
         nurse_note: formData.nurse_note || "",
       });
       setFinalResult(result);
-      const refreshed = await apiGet(`/clinical/${p_id}`);
-      setSummaryData(refreshed);
+      await loadSummary();
     } catch (submitError) {
       setError(submitError.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSendToService = async (service, requestedService) => {
+    setServiceLoading(true);
+    setError("");
+    setRouteNotice("");
+    try {
+      await apiPost("/patient/send-to-service", {
+        p_id,
+        service,
+        requested_service: requestedService,
+        scenario: "normal",
+      });
+      setRouteNotice(`Patient routed to ${service} for ${requestedService}. The ${service} queue now includes this case.`);
+      await loadSummary();
+    } catch (routeError) {
+      setError(routeError.message);
+    } finally {
+      setServiceLoading(false);
     }
   };
 
@@ -120,23 +140,15 @@ const TriageFinalize = () => {
         </div>
 
         <div className="nav-menu">
-          <div className="nav-item" onClick={() => navigate("/dashboard")}>
-            <span style={{ marginRight: "12px" }}>Home</span> Dashboard
-          </div>
-          <div className="nav-item" onClick={() => navigate("/new-patient")}>
-            <span style={{ marginRight: "12px" }}>+</span> Add New Patient
-          </div>
-          <div className="nav-item" onClick={() => navigate("/bed-assignments")}>
-            <span style={{ marginRight: "12px" }}>Bed</span> Assignments
-          </div>
-          <a className="nav-item" href={chatbotUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-            <span style={{ marginRight: "12px" }}>AI</span> Triage Agent
-          </a>
+          <div className="nav-item" onClick={() => navigate("/dashboard")}><span style={{ marginRight: "12px" }}>Home</span> Dashboard</div>
+          <div className="nav-item" onClick={() => navigate("/new-patient")}><span style={{ marginRight: "12px" }}>+</span> Add New Patient</div>
+          <div className="nav-item" onClick={() => navigate("/bed-assignments")}><span style={{ marginRight: "12px" }}>Bed</span> Assignments</div>
+          <div className="nav-item" onClick={() => navigate("/lab")}><span style={{ marginRight: "12px" }}>Lab</span> Lab</div>
+          <div className="nav-item" onClick={() => navigate("/imaging")}><span style={{ marginRight: "12px" }}>Img</span> Imaging</div>
+          <a className="nav-item" href={chatbotUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}><span style={{ marginRight: "12px" }}>AI</span> Triage Agent</a>
         </div>
 
-        <div className="logout-section" onClick={handleLogout}>
-          <span style={{ marginRight: "12px" }}>Log out</span>
-        </div>
+        <div className="logout-section" onClick={handleLogout}><span style={{ marginRight: "12px" }}>Log out</span></div>
       </div>
 
       <div className="main-content">
@@ -157,9 +169,10 @@ const TriageFinalize = () => {
 
         {loading ? <div style={{ marginTop: "18px", color: "#707EAE" }}>Loading triage summary...</div> : null}
         {error ? <div style={{ marginTop: "18px", color: "#EE5D50" }}>Action failed: {error}</div> : null}
+        {routeNotice ? <div style={{ marginTop: "18px", color: "#05CD99", fontWeight: 700 }}>{routeNotice}</div> : null}
 
         {summaryData ? (
-          <div style={{ display: "grid", gridTemplateColumns: finalResult ? "1.1fr 0.9fr" : "1fr", gap: "22px", marginTop: "24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "22px", marginTop: "24px" }}>
             <div className="patient-table-container">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
                 <div>
@@ -234,24 +247,53 @@ const TriageFinalize = () => {
               </div>
             </div>
 
-            {finalResult ? (
-              <div className="ai-panel">
-                <h3>Final CTAS Result</h3>
-                <p className="ai-subtext"><b>Vitals-informed nurse validation complete</b></p>
-                <div className="ai-stat-row"><span>CTAS Level</span><span className="val">{finalResult.ctas.level}</span></div>
-                <div className="ai-stat-row"><span>Urgency</span><span className="val">{finalResult.urgency}</span></div>
-                <div className="ai-stat-row"><span>Bed</span><span className="val">{finalResult.allocation.recommended_bed}</span></div>
-                <div className="ai-stat-row"><span>Estimated Wait</span><span className="val">{Math.round(finalResult.allocation.estimated_wait_minutes || 0)} min</span></div>
-                <div className="ai-card critical">
-                  <h4>{finalResult.ctas.name}</h4>
-                  <p>{finalResult.reason}</p>
-                  <p>{finalResult.summary}</p>
-                  <p>{finalResult.allocation.alerts?.length ? finalResult.allocation.alerts.join(", ") : "No allocation alerts."}</p>
-                  <button className="execute-btn" onClick={() => navigate(`/clinical/${p_id}`)}>Open clinical summary</button>
-                  <button className="execute-btn" onClick={() => navigate("/bed-assignments")} style={{ marginTop: "8px", background: "#05CD99" }}>Open bed assignments</button>
+            <div className="ai-panel">
+              <h3>{finalResult ? "Final CTAS Result" : "Assessment Snapshot"}</h3>
+              <p className="ai-subtext"><b>{finalResult ? "Vitals-informed nurse validation complete" : "Finalize CTAS, then route to services if needed"}</b></p>
+              <div className="ai-stat-row"><span>CTAS Level</span><span className="val">{finalResult ? finalResult.ctas.level : summaryData.ctas_level}</span></div>
+              <div className="ai-stat-row"><span>Urgency</span><span className="val">{finalResult ? finalResult.urgency : summaryData.urgency}</span></div>
+              <div className="ai-stat-row"><span>Bed</span><span className="val">{(finalResult ? finalResult.allocation.recommended_bed : summaryData.recommended_bed) || "Pending"}</span></div>
+              <div className="ai-stat-row"><span>Current Location</span><span className="val">{summaryData.current_location || "Pending"}</span></div>
+              <div className="ai-stat-row"><span>Requested Service</span><span className="val">{summaryData.requested_service || "None"}</span></div>
+              <div className="ai-stat-row"><span>Estimated Wait</span><span className="val">{Math.round((finalResult ? finalResult.allocation.estimated_wait_minutes : summaryData.estimated_wait_minutes) || 0)} min</span></div>
+              <div className="ai-card critical">
+                <h4>{finalResult ? finalResult.ctas.name : summaryData.ctas_name}</h4>
+                <p>{finalResult ? finalResult.reason : (summaryData.summary || summaryData.chief_complaint)}</p>
+                <p>{finalResult ? finalResult.summary : (summaryData.missing_vitals?.length ? `Missing vitals: ${summaryData.missing_vitals.join(", ")}` : "All required vitals already available.")}</p>
+                <p>{finalResult ? (finalResult.allocation.alerts?.length ? finalResult.allocation.alerts.join(", ") : "No allocation alerts.") : "Submit final CTAS before routing the patient downstream."}</p>
+                <button className="execute-btn" onClick={() => navigate(`/clinical/${p_id}`)}>Open clinical summary</button>
+                <button className="execute-btn" onClick={() => navigate("/bed-assignments")} style={{ marginTop: "8px", background: "#05CD99" }}>Open bed assignments</button>
+              </div>
+
+              <div className="ai-card critical" style={{ marginTop: "14px" }}>
+                <h4>Route to Lab</h4>
+                <p style={{ color: "#707EAE", fontSize: "13px", lineHeight: 1.7 }}>After CTAS is finalized, select the required lab test and add the patient to the Lab queue.</p>
+                <select value={labService} onChange={(event) => setLabService(event.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "12px", border: "1px solid #DCE3F1", marginBottom: "10px" }}>
+                  {LAB_SERVICES.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button className="execute-btn" onClick={() => handleSendToService("lab", labService)} disabled={!canRouteToService || serviceLoading} style={{ background: "#4318FF", flex: 1, opacity: !canRouteToService ? 0.55 : 1 }}>
+                    {serviceLoading ? "Routing..." : "Send to Lab"}
+                  </button>
+                  <button className="execute-btn" onClick={() => navigate("/lab")} style={{ background: "#A3AED0", flex: 1 }}>Open Lab Queue</button>
                 </div>
               </div>
-            ) : null}
+
+              <div className="ai-card critical" style={{ marginTop: "14px" }}>
+                <h4>Route to Imaging</h4>
+                <p style={{ color: "#707EAE", fontSize: "13px", lineHeight: 1.7 }}>After CTAS is finalized, select the imaging study and add the patient to the Imaging queue.</p>
+                <select value={imagingService} onChange={(event) => setImagingService(event.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: "12px", border: "1px solid #DCE3F1", marginBottom: "10px" }}>
+                  {IMAGING_SERVICES.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button className="execute-btn" onClick={() => handleSendToService("imaging", imagingService)} disabled={!canRouteToService || serviceLoading} style={{ background: "#0095FF", flex: 1, opacity: !canRouteToService ? 0.55 : 1 }}>
+                    {serviceLoading ? "Routing..." : "Send to Imaging"}
+                  </button>
+                  <button className="execute-btn" onClick={() => navigate("/imaging")} style={{ background: "#A3AED0", flex: 1 }}>Open Imaging Queue</button>
+                </div>
+                {!canRouteToService ? <p style={{ color: "#FFB547", fontSize: "12px", marginTop: "10px", lineHeight: 1.6 }}>Submit final CTAS first. Downstream service routing is disabled while the case remains preliminary.</p> : null}
+              </div>
+            </div>
           </div>
         ) : null}
       </div>
