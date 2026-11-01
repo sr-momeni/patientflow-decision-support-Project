@@ -1,0 +1,18 @@
+{
+  "primary_complaint": "Test chest pain",
+  "pain_score": 8,
+  "consciousness": "alert",
+  "spo2": 95.0,
+  "heart_rate": 110,
+  "systolic_bp": 140,
+  "respiratory_rate": 20,
+  "temperature": 37.5,
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "resp_distress": "mild",
+  "age": 45,
+  "history": [
+    "chronic_disease"
+  ],
+  "summary": "This is a test assessment."
+}

@@ -1,0 +1,11 @@
+{
+  "primary_complaint": "cough and cold",
+  "pain_score": 2,
+  "consciousness": "alert",
+  "resp_distress": "none",
+  "age": 35,
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "history": [],
+  "summary": "35-year-old with gradual onset cough and cold symptoms, mild pain, alert, no breathing difficulty, no fever or infection signs."
+}

@@ -1,0 +1,15 @@
+{
+  "primary_complaint": "stomach ache and fever",
+  "pain_score": 7,
+  "consciousness": "alert",
+  "age": 25,
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "summary": "25-year-old with stomach ache rated 7 out of 10 and reported fever, no nausea, vomiting, or diarrhea.",
+  "spo2": 98,
+  "heart_rate": 80,
+  "systolic_bp": 120,
+  "respiratory_rate": 16,
+  "temperature": 38
+}

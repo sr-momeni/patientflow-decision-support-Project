@@ -6,7 +6,7 @@
 }
 
 .sidebar {
-    width: 210px;
+    width: 280px;
     background-color: #ffffff;
     display: flex;
     flex-direction: column;
@@ -31,10 +31,9 @@
 .nav-item {
     display: flex;
     align-items: center;
-    padding: 8px 10px;
-    color: #5d5f66;
+    padding: 12px 15px;
+    color: #A3AED0;
     margin-bottom: 15px;
-    margin-left: 5px;
     cursor: pointer;
     font-weight: 500;
     border-radius: 15px;
@@ -42,76 +41,52 @@
 }
 
 .nav-item.active {
-    background-color: hsl(251, 62%, 50%);
+    background-color: #4318FF;
     color: #ffffff;
 }
 
 .nav-item:hover:not(.active) {
     background-color: #f4f7fe;
-    color:  #5d5f66;
+    color: #4318FF;
 }
 
 .logout-section {
     display: flex;
     align-items: center;
-    padding: 12px 24px;
-    margin-top: auto; /* Pushes logout to the bottom */
-    margin-bottom: 20px;
+    padding: 15px;
+    color: #A3AED0;
     cursor: pointer;
-    transition: all 0.3s ease;
+    font-weight: 500;
+    border-top: 1px solid #F4F7FE;
+    transition: 0.3s;
 }
 
-/* Base style for the Icons8 image */
-.sidebar-icon-img {
-    width: 28px; 
-    height: 28px;
-    margin-right: 12px;
-    transition: all 0.3s ease;
-    /* This filter makes the icon match your muted blue (#707EAE) */
-    filter: invert(56%) sepia(13%) saturate(1061%) hue-rotate(191deg) brightness(91%) contrast(85%);
+.logout-section:hover {
+    color: #ee5d50;
 }
 
-/* HOVER EFFECT: Turn Icon and Text Black */
-.logout-section:hover .sidebar-icon-img {
-    filter: brightness(0); /* Turns the icon solid black */
-}
-
-.logout-section:hover .nav-text {
-    color: #000000;
-}
-
-.logout-section .nav-text {
-    font-size: 16px;
-    font-weight: 700; /* Bold DM Sans font */
-    color: #707EAE;
-}
 .main-content {
     flex: 1;
     padding: 40px;
 }
 
 .welcome-banner {
-    background: linear-gradient(135deg, hsl(251, 62%, 50%));
+    background: linear-gradient(135deg, #4318FF 0%, #5E37FF 100%);
     border-radius: 30px;
-    margin-top: 60px;
-    padding: 35px 40px;
+    padding: 50px;
     color: #ffffff;
-    box-shadow: hsl(251, 62%, 50%);
+    box-shadow: 0px 20px 40px rgba(67, 24, 255, 0.2);
 }
 
 .white-icon {
-    width: 25px; 
-    height: 25px;
+    width: 18px; 
+    height: auto;
     filter: brightness(0) invert(1); 
 }
-.nav-text {
-    font-size: 16px;
-    font-weight: 350; /* Bolder font for the Dashboard text */
-    letter-spacing: -0.02em;
-}
+
 
 .icon-box-active {
-    
+    background-color: #0047BB; 
     width: 38px;
     height: 38px;
     display: flex;
@@ -145,92 +120,7 @@
 .triage-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
 
 
-.triage-card-refined {
-    background: #ffffff;
-    border: 1px solid #EAECF0;
-    border-radius: 12px;
-    padding: 45px;
-    margin-top: 20px;
-    box-shadow: 1cqb 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
-}
 
-.card-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-}
-
-.card-header h3 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #101828;
-    margin: 0;
-}
-
-.card-header img {
-    width: 24px;
-    height: 24px;
-}
-
-.input-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.input-group.full-width {
-    grid-column: span 2;
-}
-
-.input-group label {
-    font-size: 14px;
-    font-weight: 500;
-    color: #344054;
-}
-
-.input-field {
-    padding: 10px 14px;
-    border: 1px solid #D0D5DD;
-    border-radius: 8px;
-    font-size: 16px;
-    color: #101828;
-    background: #ffffff;
-    outline: none;
-    box-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
-}
-
-.input-field.read-only {
-    background-color: #F9FAFB;
-    color: #667085;
-}
-
-.input-field.text-area {
-    min-height: 120px;
-    resize: vertical;
-}
-
-.helper-text {
-    font-size: 12px;
-    color: #667085;
-}
-
-/* For the Select dropdown arrows */
-select.input-field {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23667085'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    background-size: 16px;
-    padding-right: 40px;
-}
 
 /* Layout containers */
 .dashboard-grid-layout {

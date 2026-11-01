@@ -1,0 +1,11 @@
+{
+  "primary_complaint": "stomach ache with fever",
+  "pain_score": 9,
+  "consciousness": "alert",
+  "age": 24,
+  "resp_distress": "none",
+  "active_seizure": false,
+  "uncontrollable_hemorrhage": false,
+  "temperature": 38.5,
+  "summary": "24-year-old with severe stomach ache, fever, and no measured temperature provided."
+}

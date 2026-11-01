@@ -1,18 +1,18 @@
 {
   "files": {
-    "main.css": "/static/css/main.ac548793.css",
-    "main.js": "/static/js/main.57767300.js",
-    "static/js/453.20359781.chunk.js": "/static/js/453.20359781.chunk.js",
+    "main.css": "/static/css/main.a1959b3f.css",
+    "main.js": "/static/js/main.0539ae01.js",
+    "static/js/125.fcd0d074.chunk.js": "/static/js/125.fcd0d074.chunk.js",
     "static/media/Staff.png": "/static/media/Staff.69385f9e1bf65821079c.png",
     "static/media/ehospitallogo.png": "/static/media/ehospitallogo.c5c93beb989dbb71d795.png",
     "static/media/ehosp.png": "/static/media/ehosp.a083c4e15181c8e0afbe.png",
     "index.html": "/index.html",
-    "main.ac548793.css.map": "/static/css/main.ac548793.css.map",
-    "main.57767300.js.map": "/static/js/main.57767300.js.map",
-    "453.20359781.chunk.js.map": "/static/js/453.20359781.chunk.js.map"
+    "main.a1959b3f.css.map": "/static/css/main.a1959b3f.css.map",
+    "main.0539ae01.js.map": "/static/js/main.0539ae01.js.map",
+    "125.fcd0d074.chunk.js.map": "/static/js/125.fcd0d074.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.ac548793.css",
-    "static/js/main.57767300.js"
+    "static/css/main.a1959b3f.css",
+    "static/js/main.0539ae01.js"
   ]
 }

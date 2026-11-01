@@ -4,352 +4,351 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ER Triage Assistant</title>
+    <title>eHospital Triage Agent</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
-        *,
-        *::before,
-        *::after {
+        * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
         }
 
         :root {
-            --bg: #0f1117;
-            --surface: #1a1d27;
-            --surface2: #22263a;
-            --border: #2e3250;
-            --accent: #4f7cff;
-            --accent-glow: rgba(79, 124, 255, 0.25);
-            --text: #e8eaf0;
-            --text-dim: #8b90a8;
-            --bubble-user: #2a3060;
-            --bubble-ai: #1e2235;
-            --radius: 16px;
-            --radius-sm: 10px;
+            --bg: #f4f7fe;
+            --surface: #ffffff;
+            --surface-2: #f8faff;
+            --border: #e0e5f2;
+            --accent: #4318ff;
+            --accent-soft: rgba(67, 24, 255, 0.08);
+            --danger: #ee5d50;
+            --text: #1b2559;
+            --text-dim: #707eae;
+            --user: #4318ff;
+            --assistant: #f8faff;
+            --radius: 18px;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            font-family: "DM Sans", sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
 
-        /* ── Header ── */
-        header {
-            width: 100%;
-            padding: 18px 32px;
+        .page {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 24px 18px 32px;
+        }
+
+        .header {
             display: flex;
             align-items: center;
             gap: 14px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            padding: 22px 24px;
+            border-radius: 26px;
+            background: linear-gradient(135deg, #4318ff 0%, #5a36ff 100%);
+            color: #ffffff;
+            box-shadow: 0 12px 28px rgba(67, 24, 255, 0.18);
+            margin-bottom: 18px;
         }
 
         .header-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--accent);
-            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            box-shadow: 0 0 12px var(--accent-glow);
+            background: rgba(255, 255, 255, 0.16);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
         }
 
-        header h1 {
-            font-size: 18px;
-            font-weight: 600;
+        .header-copy h1 {
+            margin: 0;
+            font-size: 20px;
         }
 
-        .header-badge {
+        .header-copy p {
+            margin: 4px 0 0;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 13px;
+        }
+
+        .header-actions {
             margin-left: auto;
-            font-size: 11px;
-            padding: 4px 10px;
-            background: rgba(79, 124, 255, 0.15);
-            border: 1px solid rgba(79, 124, 255, 0.3);
-            border-radius: 20px;
-            color: var(--accent);
-            letter-spacing: 0.04em;
-        }
-
-        /* ── Layout ── */
-        .chat-wrapper {
-            width: 100%;
-            max-width: 780px;
-            flex: 1;
             display: flex;
-            flex-direction: column;
-            padding: 24px 16px 0;
-            gap: 16px;
-        }
-
-        /* ── Voice orb ── */
-        .orb-container {
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 16px;
-            padding: 24px 0 10px;
         }
 
-        .orb-wrap {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            display: flex;
+        .dashboard-link {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-        }
-
-        .orb {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 35% 35%, #6b9fff, #2a52cc);
-            box-shadow: 0 0 30px rgba(79, 124, 255, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-
-        .orb.listening {
-            animation: orbPulse 1.4s ease-in-out infinite;
-            box-shadow: 0 0 50px rgba(79, 124, 255, 0.7);
-        }
-
-        .orb.speaking {
-            background: radial-gradient(circle at 35% 35%, #6fffa0, #1a9c55);
-            box-shadow: 0 0 50px rgba(39, 174, 96, 0.6);
-            animation: orbPulse 0.8s ease-in-out infinite;
-        }
-
-        .orb.waiting {
-            background: radial-gradient(circle at 35% 35%, #aaaacc, #444466);
-            box-shadow: 0 0 16px rgba(100, 100, 160, 0.3);
-        }
-
-        @keyframes orbPulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.08);
-            }
-        }
-
-        /* Ripple rings while listening */
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            border: 2px solid rgba(79, 124, 255, 0.3);
-            animation: rippleOut 2s ease-out infinite;
-            pointer-events: none;
-        }
-
-        .ripple:nth-child(2) {
-            animation-delay: 0.5s;
-        }
-
-        .ripple:nth-child(3) {
-            animation-delay: 1s;
-        }
-
-        @keyframes rippleOut {
-            0% {
-                width: 80px;
-                height: 80px;
-                opacity: 0.7;
-            }
-
-            100% {
-                width: 140px;
-                height: 140px;
-                opacity: 0;
-            }
-        }
-
-        .orb-label {
+            min-height: 44px;
+            padding: 0 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.26);
+            background: rgba(255, 255, 255, 0.14);
+            color: #ffffff;
+            text-decoration: none;
             font-size: 13px;
-            color: var(--text-dim);
-            text-align: center;
-            min-height: 20px;
+            font-weight: 700;
+            transition: background 0.2s ease, transform 0.2s ease;
         }
 
-        /* ── Status bar ── */
-        #status-bar {
-            background: var(--surface2);
+        .dashboard-link:hover {
+            background: rgba(255, 255, 255, 0.22);
+            transform: translateY(-1px);
+        }
+
+        .notice-grid {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 10px 16px;
-            font-size: 13px;
+            border-radius: 20px;
+            padding: 18px;
+            box-shadow: 0 10px 24px rgba(17, 34, 68, 0.04);
+        }
+
+        .card h2 {
+            margin: 0 0 10px;
+            font-size: 16px;
+        }
+
+        .card p,
+        .card li {
             color: var(--text-dim);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            line-height: 1.6;
+            font-size: 14px;
         }
 
-        #status-bar .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--text-dim);
-            flex-shrink: 0;
+        .card ul {
+            margin: 0;
+            padding-left: 18px;
         }
 
-        #status-bar.listening .dot {
-            background: var(--accent);
-            animation: blink 1s infinite;
-        }
-
-        #status-bar.speaking .dot {
-            background: #2ecc71;
-            animation: blink 0.8s infinite;
-        }
-
-        #status-bar.thinking .dot {
-            background: #e67e22;
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: 0.25
-            }
-        }
-
-        /* ── Chat log ── */
-        #chat-log {
-            flex: 1;
-            overflow-y: auto;
+        .voice-box {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            padding-bottom: 8px;
-            scroll-behavior: smooth;
+            justify-content: center;
+            background: #fafcff;
         }
 
-        #chat-log::-webkit-scrollbar {
-            width: 4px;
+        .voice-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        #chat-log::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 4px;
+        .voice-btn {
+            padding: 14px 18px;
+            border-radius: 14px;
+            border: 1px solid #dfe6ff;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-weight: 700;
+            cursor: pointer;
         }
 
-        .bubble-row {
+        .voice-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .voice-btn.secondary {
+            background: #fff5f5;
+            border-color: #ffd7d7;
+            color: var(--danger);
+        }
+
+        .status {
+            margin-bottom: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid #dfe6ff;
+            background: var(--accent-soft);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .chat-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-height: 520px;
+        }
+
+        .chat-log {
+            flex: 1;
+            min-height: 340px;
+            max-height: 520px;
+            overflow-y: auto;
+            padding: 6px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-row {
             display: flex;
             gap: 10px;
             align-items: flex-end;
-            animation: fadeUp 0.25s ease;
         }
 
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(8px)
-            }
-
-            to {
-                opacity: 1;
-                transform: none
-            }
-        }
-
-        .bubble-row.user {
+        .chat-row.user {
             flex-direction: row-reverse;
         }
 
         .avatar {
             width: 34px;
             height: 34px;
+            flex-shrink: 0;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 15px;
-            flex-shrink: 0;
         }
 
-        .avatar.ai {
+        .avatar.assistant {
             background: var(--accent);
-            box-shadow: 0 0 8px var(--accent-glow);
         }
 
         .avatar.user {
-            background: var(--surface2);
+            background: var(--surface-2);
             border: 1px solid var(--border);
         }
 
         .bubble {
-            max-width: 72%;
-            padding: 12px 16px;
-            border-radius: var(--radius);
-            font-size: 15px;
+            max-width: 78%;
+            padding: 12px 14px;
+            border-radius: 16px;
             line-height: 1.6;
+            font-size: 14px;
+            white-space: pre-wrap;
         }
 
-        .bubble.ai {
-            background: var(--bubble-ai);
+        .bubble.assistant {
+            background: var(--assistant);
             border: 1px solid var(--border);
-            border-bottom-left-radius: 4px;
+            border-bottom-left-radius: 6px;
         }
 
         .bubble.user {
-            background: var(--bubble-user);
-            border-bottom-right-radius: 4px;
+            background: var(--user);
+            border-bottom-right-radius: 6px;
         }
 
-        /* ── Result card ── */
-        #result-card {
-            display: none;
-            border-radius: var(--radius);
+        .composer {
             border: 1px solid var(--border);
+            border-radius: 18px;
+            background: #ffffff;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .composer-top {
+            display: flex;
+            gap: 10px;
+        }
+
+        .composer input {
+            flex: 1;
+            border: 1px solid #d0d5dd;
+            background: #ffffff;
+            color: var(--text);
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-size: 14px;
+        }
+
+        .composer input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.18);
+        }
+
+        .send-btn,
+        .reset-btn {
+            border: none;
+            border-radius: 14px;
+            padding: 0 18px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .send-btn {
+            background: var(--accent);
+            color: white;
+            min-width: 110px;
+        }
+
+        .send-btn:disabled,
+        .reset-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .composer-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .reset-btn {
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+        }
+
+        .voice-state {
+            color: var(--text-dim);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .result-card {
+            display: none;
+            margin-top: 6px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
             overflow: hidden;
-            animation: fadeUp 0.35s ease;
-            margin-bottom: 16px;
+            background: var(--surface);
         }
 
         .result-header {
-            padding: 20px 24px 16px;
             display: flex;
             align-items: center;
             gap: 16px;
+            padding: 18px;
         }
 
         .ctas-badge {
-            width: 68px;
-            height: 68px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
+            color: white;
             display: flex;
             flex-direction: column;
-            align-items: center;
             justify-content: center;
-            color: #fff;
+            align-items: center;
             font-weight: 700;
             flex-shrink: 0;
         }
@@ -360,596 +359,583 @@
         }
 
         .ctas-badge .lbl {
-            font-size: 9px;
-            letter-spacing: 0.06em;
+            font-size: 10px;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        .result-title h2 {
+        .result-copy h3 {
+            margin: 0;
             font-size: 18px;
-            font-weight: 600;
         }
 
-        .result-title p {
-            font-size: 13px;
+        .result-copy p {
+            margin: 6px 0 0;
             color: var(--text-dim);
-            margin-top: 3px;
-        }
-
-        .result-summary {
-            padding: 14px 24px 20px;
-            background: rgba(0, 0, 0, 0.2);
+            line-height: 1.6;
             font-size: 14px;
-            line-height: 1.65;
-            color: var(--text-dim);
+        }
+
+        .result-body {
             border-top: 1px solid var(--border);
-        }
-
-        .result-summary strong {
-            color: var(--text);
-        }
-
-        /* ── Controls ── */
-        .controls {
-            position: sticky;
-            bottom: 0;
-            background: var(--bg);
-            padding: 12px 0 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-
-        #start-btn {
-            background: var(--accent);
-            border: none;
-            border-radius: 50px;
-            padding: 14px 36px;
-            color: #fff;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 0 24px var(--accent-glow);
-            transition: opacity 0.2s, transform 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        #start-btn:hover {
-            opacity: 0.88;
-            transform: scale(1.03);
-        }
-
-        #start-btn:disabled {
-            opacity: 0.35;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        #end-btn {
-            background: rgba(192, 57, 43, 0.15);
-            border: 1px solid rgba(192, 57, 43, 0.4);
-            border-radius: 50px;
-            padding: 10px 28px;
-            color: #e57373;
+            padding: 16px 18px;
+            background: rgba(67, 24, 255, 0.04);
+            display: grid;
+            gap: 8px;
             font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            display: none;
-            transition: background 0.2s;
         }
 
-        #end-btn:hover {
-            background: rgba(192, 57, 43, 0.25);
-        }
-
-        #reset-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 50px;
-            padding: 8px 20px;
-            color: var(--text-dim);
-            font-size: 13px;
-            cursor: pointer;
-            display: none;
-            transition: border-color 0.2s, color 0.2s;
-        }
-
-        #reset-btn:hover {
-            border-color: var(--accent);
+        .result-body strong {
             color: var(--text);
         }
 
-        /* hidden audio element */
-        #ai-audio {
-            display: none;
-        }
-
-        /* ── Debug log ── */
-        #debug-panel {
-            width: 100%;
-            background: #0a0c10;
-            border-top: 1px solid #1e2235;
-            padding: 0;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-        }
-
-        #debug-header {
+        .result-actions {
+            padding: 0 18px 18px;
             display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #1e2235;
-            color: #5a6080;
-            user-select: none;
+            justify-content: flex-end;
         }
 
-        #debug-header:hover {
-            color: #8b90a8;
-        }
-
-        #debug-header span {
-            margin-left: auto;
-            font-size: 10px;
-        }
-
-        #debug-log {
-            height: 200px;
-            overflow-y: auto;
-            padding: 8px 16px;
-        }
-
-        #debug-log::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        #debug-log::-webkit-scrollbar-thumb {
-            background: #2e3250;
-        }
-
-        .log-entry {
-            padding: 1px 0;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .log-entry.info {
-            color: #8b90a8;
-        }
-
-        .log-entry.event {
-            color: #4f7cff;
-        }
-
-        .log-entry.audio {
-            color: #2ecc71;
-        }
-
-        .log-entry.warning {
-            color: #e67e22;
-        }
-
-        .log-entry.error {
-            color: #e74c3c;
-        }
-
-        .log-entry.send {
-            color: #9b59b6;
-        }
-
-        #clear-log {
-            background: none;
+        .finalize-btn {
             border: none;
+            border-radius: 14px;
+            padding: 12px 18px;
+            background: var(--accent);
+            color: #ffffff;
+            font-weight: 700;
             cursor: pointer;
-            color: #5a6080;
-            font-size: 10px;
-            padding: 0 4px;
         }
 
-        #clear-log:hover {
-            color: #e74c3c;
+        @media (max-width: 720px) {
+            .page {
+                padding: 16px 12px 24px;
+            }
+
+            .notice-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .composer-top {
+                flex-direction: column;
+            }
+
+            .send-btn {
+                min-height: 48px;
+            }
+
+            .bubble {
+                max-width: 88%;
+            }
+
+            .header {
+                flex-wrap: wrap;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .dashboard-link {
+                width: 100%;
+            }
         }
     </style>
 </head>
 
 <body>
-
-    <header>
-        <div class="header-icon">🏥</div>
-        <h1>ER Triage Assistant</h1>
-        <span class="header-badge">⚡ Realtime Voice · CTAS</span>
-    </header>
-
-    <audio id="ai-audio" autoplay></audio>
-
-    <div class="chat-wrapper">
-
-        <div id="status-bar" class="">
-            <div class="dot"></div><span id="status-text">Press Start to begin your voice assessment.</span>
-        </div>
-
-        <!-- Voice orb (shown while session is active) -->
-        <div class="orb-container" id="orb-section" style="display:none">
-            <div class="orb-wrap" id="orb-wrap">
-                <div class="orb waiting" id="orb">🩺</div>
+    <div class="page">
+        <div class="header">
+            <div class="header-icon">ER</div>
+            <div class="header-copy">
+                <h1>eHospital Triage Agent</h1>
+                <p>Symptom-only ED intake tied to live CTAS scoring and prioritization.</p>
             </div>
-            <div class="orb-label" id="orb-label">Connecting…</div>
+            <div class="header-actions">
+                <a class="dashboard-link" id="dashboard-link" href="/dashboard">Back to Dashboard</a>
+            </div>
         </div>
 
-        <div id="chat-log"></div>
+        <div class="notice-grid">
+            <div class="card">
+                <h2>Instructions</h2>
+                <ul>
+                    <li>Type one short message describing the main symptoms and when they started.</li>
+                    <li>Do not enter name, address, health card, or other identifiers.</li>
+                    <li>The assistant will ask only brief clarifying questions if strictly needed.</li>
+                    <li>Measured nurse vitals stay in the local workflow; if they are missing, the assessment remains preliminary.</li>
+                </ul>
+            </div>
+            <div class="card voice-box">
+                <h2>Voice mode</h2>
+                <div class="voice-actions">
+                    <button class="voice-btn" id="voice-btn">Start live voice</button>
+                    <button class="voice-btn secondary" id="voice-stop-btn" disabled>End live voice</button>
+                    <button class="voice-btn" id="voice-record-btn">Record one voice message</button>
+                </div>
+                <p id="voice-state" class="voice-state">Live voice will be attempted first. If realtime is unavailable, recorded voice falls back to Whisper transcription and the same triage agent scoring flow.</p>
+            </div>
+        </div>
 
-        <div id="result-card">
-            <div class="result-header">
-                <div class="ctas-badge" id="result-badge"><span class="num" id="result-num">—</span><span
-                        class="lbl">CTAS</span></div>
-                <div class="result-title">
-                    <h2 id="result-name">—</h2>
-                    <p id="result-desc">—</p>
+        <div class="status" id="status-bar">Type a short symptom summary below to begin.</div>
+
+        <div class="card chat-shell">
+            <div class="chat-log" id="chat-log"></div>
+
+            <div class="composer">
+                <div class="composer-top">
+                    <input id="text-input" type="text" placeholder="Example: Chest pain started 20 minutes ago and I feel short of breath." maxlength="800" />
+                    <button id="send-btn" class="send-btn">Send</button>
+                </div>
+                <div class="composer-meta">
+                    <span>Short, direct symptom-only message. Registration stays outside this chat.</span>
+                    <button id="reset-btn" class="reset-btn">New assessment</button>
                 </div>
             </div>
-            <div class="result-summary" id="result-summary">—</div>
-        </div>
 
-        <div class="controls">
-            <button id="start-btn">🎙️ Start Voice Assessment</button>
-            <button id="end-btn">✕ End Assessment</button>
-            <button id="reset-btn">↺ New Assessment</button>
+            <div class="result-card" id="result-card">
+                <div class="result-header">
+                    <div class="ctas-badge" id="result-badge">
+                        <span class="num" id="result-num">-</span>
+                        <span class="lbl">CTAS</span>
+                    </div>
+                    <div class="result-copy">
+                        <h3 id="result-name">-</h3>
+                        <p id="result-desc">-</p>
+                    </div>
+                </div>
+                <div class="result-body">
+                    <div><strong>Urgency:</strong> <span id="result-urgency">-</span></div>
+                    <div><strong>Reason:</strong> <span id="result-reason">-</span></div>
+                    <div><strong>Clinical summary:</strong> <span id="result-summary">-</span></div>
+                    <div><strong>Allocation:</strong> <span id="result-allocation">-</span></div>
+                    <div><strong>Assessment status:</strong> <span id="result-preliminary">-</span></div>
+                </div>
+                <div class="result-actions" id="result-finalize-wrap" style="display:none;">
+                    <button id="result-finalize-btn" class="finalize-btn">Finalize with nurse vitals</button>
+                </div>
+            </div>
         </div>
-
-    </div><!-- /chat-wrapper -->
-
-    <!-- Debug log panel -->
-    <div id="debug-panel" style="max-width:780px;width:100%;margin:0 auto;">
-        <div id="debug-header" onclick="toggleDebug()">
-            🔍 <strong>Debug Log</strong>
-            <button id="clear-log" onclick="event.stopPropagation();clearLog()">✕ clear</button>
-            <span id="debug-toggle">▲ hide</span>
-        </div>
-        <div id="debug-log"></div>
     </div>
 
     <script>
-        // ── Elements ──────────────────────────────────────────────────────────────
-        const statusBar = document.getElementById('status-bar');
-        const statusText = document.getElementById('status-text');
-        const chatLog = document.getElementById('chat-log');
-        const orbSection = document.getElementById('orb-section');
-        const orbWrap = document.getElementById('orb-wrap');
-        const orb = document.getElementById('orb');
-        const orbLabel = document.getElementById('orb-label');
-        const startBtn = document.getElementById('start-btn');
-        const endBtn = document.getElementById('end-btn');
-        const resetBtn = document.getElementById('reset-btn');
-        const aiAudio = document.getElementById('ai-audio');
-        const resultCard = document.getElementById('result-card');
-        const debugLog = document.getElementById('debug-log');
+        const statusBar = document.getElementById("status-bar");
+        const chatLog = document.getElementById("chat-log");
+        const textInput = document.getElementById("text-input");
+        const sendBtn = document.getElementById("send-btn");
+        const resetBtn = document.getElementById("reset-btn");
+        const voiceBtn = document.getElementById("voice-btn");
+        const voiceStopBtn = document.getElementById("voice-stop-btn");
+        const voiceRecordBtn = document.getElementById("voice-record-btn");
+        const voiceState = document.getElementById("voice-state");
+        const resultCard = document.getElementById("result-card");
+        const resultFinalizeWrap = document.getElementById("result-finalize-wrap");
+        const resultFinalizeBtn = document.getElementById("result-finalize-btn");
+        const dashboardLink = document.getElementById("dashboard-link");
 
-        // ── Debug logger ──────────────────────────────────────────────────────────
-        function log(msg, type = 'info') {
-            const ts = new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
-            const el = document.createElement('div');
-            el.className = `log-entry ${type}`;
-            el.textContent = `[${ts}] ${msg}`;
-            debugLog.appendChild(el);
-            debugLog.scrollTop = debugLog.scrollHeight;
-            console.log(`[${type}] ${msg}`);
-        }
-        function toggleDebug() {
-            const panel = document.getElementById('debug-log');
-            const tog = document.getElementById('debug-toggle');
-            if (panel.style.display === 'none') { panel.style.display = 'block'; tog.textContent = '▲ hide'; }
-            else { panel.style.display = 'none'; tog.textContent = '▼ show'; }
-        }
-        function clearLog() { debugLog.innerHTML = ''; }
+        function resolveDashboardUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const returnUrl = (params.get("returnUrl") || "").trim();
+            if (returnUrl) return returnUrl;
 
-        // ── State ──────────────────────────────────────────────────────────────────
-        let pc = null;       // RTCPeerConnection
-        let dc = null;       // DataChannel
-        let sessionActive = false;
-        let currentAiText = '';   // accumulate streaming AI transcript
+            const referrer = document.referrer || "";
+            if (referrer) {
+                try {
+                    const refUrl = new URL(referrer);
+                    if (refUrl.pathname.includes("/dashboard")) return refUrl.toString();
+                    return `${refUrl.origin}/dashboard`;
+                } catch (error) {}
+            }
 
-        // ── Helpers ────────────────────────────────────────────────────────────────
-        function setStatus(state, text) {
-            statusBar.className = state;
-            statusText.textContent = text;
+            if (window.location.port === "8000") return "http://127.0.0.1:3000/dashboard";
+            return "/dashboard";
         }
 
-        function setOrb(state) {
-            // state: 'waiting' | 'listening' | 'speaking'
-            orb.className = `orb ${state}`;
-            // ripple rings only when listening
-            orbWrap.querySelectorAll('.ripple').forEach(r => r.remove());
-            if (state === 'listening') {
-                for (let i = 0; i < 3; i++) {
-                    const r = document.createElement('div');
-                    r.className = 'ripple';
-                    orbWrap.appendChild(r);
-                }
-                orbLabel.textContent = 'Listening… speak now';
-                setStatus('listening', 'Listening to you…');
-            } else if (state === 'speaking') {
-                orbLabel.textContent = 'Assistant is speaking…';
-                setStatus('speaking', 'Assistant is speaking…');
-            } else {
-                orbLabel.textContent = 'Ready — speak when you\'re ready';
-                setStatus('', 'Say something when you\'re ready.');
+
+        function resolveFrontendBaseUrl() {
+            const dashboardUrl = resolveDashboardUrl();
+            try {
+                return new URL(dashboardUrl, window.location.origin).origin;
+            } catch (error) {
+                if (window.location.port === "8000") return "http://127.0.0.1:3000";
+                return window.location.origin;
             }
         }
 
-        function addBubble(role, text) {
-            if (!text.trim()) return;
-            const row = document.createElement('div');
-            row.className = `bubble-row ${role}`;
-            const avatar = document.createElement('div');
-            avatar.className = `avatar ${role}`;
-            avatar.textContent = role === 'ai' ? '🏥' : '🧑';
-            const bubble = document.createElement('div');
-            bubble.className = `bubble ${role}`;
-            bubble.textContent = text;
-            row.appendChild(avatar);
-            row.appendChild(bubble);
-            chatLog.appendChild(row);
+        function buildFinalizeUrl(patientId) {
+            return `${resolveFrontendBaseUrl()}/triage-finalize/${encodeURIComponent(patientId)}`;
+        }
+
+        let chatHistory = [];
+        let assessmentComplete = false;
+        let sending = false;
+        let mediaRecorder = null;
+        let recordingStream = null;
+        let recordedChunks = [];
+        let voiceSessionActive = false;
+        let voicePeerConnection = null;
+        let voiceDataChannel = null;
+        let voiceStream = null;
+        let remoteAudioElement = null;
+
+        function setStatus(text) { statusBar.textContent = text; }
+        function setVoiceState(text) { if (voiceState) voiceState.textContent = text; }
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function renderHistory(history) {
+            chatLog.innerHTML = "";
+            history.forEach((message) => {
+                const role = message.role === "assistant" ? "assistant" : "user";
+                const row = document.createElement("div");
+                row.className = `chat-row ${role}`;
+
+                const avatar = document.createElement("div");
+                avatar.className = `avatar ${role}`;
+                avatar.textContent = role === "assistant" ? "ER" : "PT";
+
+                const bubble = document.createElement("div");
+                bubble.className = `bubble ${role}`;
+                bubble.innerHTML = escapeHtml(message.content || "");
+
+                row.appendChild(avatar);
+                row.appendChild(bubble);
+                chatLog.appendChild(row);
+            });
             chatLog.scrollTop = chatLog.scrollHeight;
-            return bubble;
+        }
+
+        function renderIntro() {
+            if (chatHistory.length > 0) {
+                renderHistory(chatHistory);
+                return;
+            }
+            renderHistory([{ role: "assistant", content: "Please briefly describe your main symptoms and when they started." }]);
+        }
+
+        function setComposerState(disabled) {
+            textInput.disabled = disabled;
+            sendBtn.disabled = disabled;
+        }
+
+        function setVoiceButtons() {
+            if (voiceBtn) voiceBtn.disabled = assessmentComplete || voiceSessionActive;
+            if (voiceStopBtn) voiceStopBtn.disabled = !voiceSessionActive;
+            if (voiceRecordBtn) {
+                voiceRecordBtn.disabled = assessmentComplete || voiceSessionActive;
+                if (mediaRecorder && mediaRecorder.state === "recording") {
+                    voiceRecordBtn.textContent = "Stop recording";
+                } else {
+                    voiceRecordBtn.textContent = "Record one voice message";
+                }
+            }
         }
 
         function showResult(result) {
-            document.getElementById('result-num').textContent = result.ctas_level;
-            document.getElementById('result-name').textContent = `CTAS ${result.ctas_level} — ${result.ctas_name}`;
-            document.getElementById('result-desc').textContent = result.ctas_description;
-            document.getElementById('result-badge').style.background = result.color;
-            document.getElementById('result-summary').innerHTML =
-                `<strong>Clinical Summary:</strong> ${result.summary}`;
-            resultCard.style.display = 'block';
-            resultCard.scrollIntoView({ behavior: 'smooth' });
-            resetBtn.style.display = 'block';
-            endSession();
+            document.getElementById("result-num").textContent = result.ctas_level ?? "-";
+            document.getElementById("result-name").textContent = `CTAS ${result.ctas_level} - ${result.ctas_name}`;
+            document.getElementById("result-desc").textContent = result.ctas_description || "-";
+            document.getElementById("result-badge").style.background = result.color || "#4318ff";
+            document.getElementById("result-urgency").textContent = result.urgency || "-";
+            document.getElementById("result-reason").textContent = result.reason || "-";
+            document.getElementById("result-summary").textContent = result.summary || "-";
+            document.getElementById("result-allocation").textContent = result.allocation ? `${result.allocation.recommended_bed} bed, ${Math.round(result.allocation.estimated_wait_minutes || 0)} min wait` : "Not available";
+            const preliminaryText = result.preliminary
+                ? `Preliminary - missing vitals: ${(result.missing_vitals || []).join(", ") || "nurse vitals pending"}`
+                : "Vitals-informed assessment";
+            document.getElementById("result-preliminary").textContent = preliminaryText;
+            if (resultFinalizeWrap && resultFinalizeBtn) {
+                if (result.preliminary && result.patient_id) {
+                    resultFinalizeWrap.style.display = "flex";
+                    resultFinalizeBtn.onclick = () => {
+                        window.location.href = buildFinalizeUrl(result.patient_id);
+                    };
+                } else {
+                    resultFinalizeWrap.style.display = "none";
+                    resultFinalizeBtn.onclick = null;
+                }
+            }
+            resultCard.style.display = "block";
+            assessmentComplete = true;
+            if (voiceSessionActive) stopVoiceSession(true);
+            setComposerState(true);
+            setVoiceButtons();
+            setStatus('Assessment complete. Use "New assessment" to restart.');
         }
 
-        // ── Realtime API — WebRTC Setup ────────────────────────────────────────────
-        async function startSession() {
-            log('▶ START button clicked', 'info');
-            startBtn.disabled = true;
-            setStatus('thinking', 'Connecting to OpenAI Realtime…');
+        async function speakAssistantReply(text) {
+            try {
+                const response = await fetch("/chatbot/speak", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text }),
+                });
+                if (!response.ok) return;
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const audio = new Audio(url);
+                audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
+                await audio.play().catch(() => {});
+            } catch (error) {
+                // Leave the text result visible even if TTS is unavailable.
+            }
+        }
+
+        async function sendStructuredMessage(message, options = {}) {
+            const trimmed = (message || "").trim();
+            if (!trimmed || sending || assessmentComplete) return;
+
+            sending = true;
+            setComposerState(true);
+            setVoiceButtons();
+            setStatus(options.voice ? "Processing voice transcript..." : "Sending triage message...");
 
             try {
-                // 1. Get ephemeral token from our backend
-                log('→ POST /chatbot/realtime-session', 'send');
-                const tokenResp = await fetch('/chatbot/realtime-session', { method: 'POST' });
-                log(`← session response: ${tokenResp.status} ${tokenResp.statusText}`, tokenResp.ok ? 'info' : 'error');
-                if (!tokenResp.ok) {
-                    const err = await tokenResp.json().catch(() => ({}));
-                    throw new Error(err.detail || `Session creation failed (${tokenResp.status})`);
+                const response = await fetch("/chatbot/message", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: trimmed, history: chatHistory }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || `Request failed (${response.status})`);
+
+                chatHistory = Array.isArray(payload.history) ? payload.history : [];
+                renderHistory(chatHistory);
+                textInput.value = "";
+
+                if (payload.result) {
+                    showResult(payload.result);
+                } else {
+                    setStatus(options.voice ? "Voice message processed. The assistant response is now in the chat." : "Reply received. Add more symptoms only if needed.");
+                    setComposerState(false);
+                    textInput.focus();
+                    if (options.autoSpeak && payload.reply) {
+                        await speakAssistantReply(payload.reply);
+                    }
                 }
-                const sessionData = await tokenResp.json();
-                log(`← session keys: ${Object.keys(sessionData).join(', ')}`, 'info');
-                const ephemeralKey = sessionData?.client_secret?.value;
-                if (!ephemeralKey) throw new Error('No ephemeral key returned from server.');
-                log(`← ephemeral key obtained (length ${ephemeralKey.length})`, 'info');
+            } catch (error) {
+                setStatus(`Error: ${error.message}`);
+                setComposerState(false);
+            } finally {
+                sending = false;
+                setVoiceButtons();
+            }
+        }
 
-                // 2. Set up WebRTC peer connection
-                log('Setting up RTCPeerConnection…', 'info');
-                pc = new RTCPeerConnection();
-                pc.onconnectionstatechange = () => log(`PeerConnection state: ${pc.connectionState}`, 'info');
-                pc.oniceconnectionstatechange = () => log(`ICE state: ${pc.iceConnectionState}`, 'info');
-                pc.onicegatheringstatechange = () => log(`ICE gathering: ${pc.iceGatheringState}`, 'info');
+        async function sendMessage() {
+            return sendStructuredMessage(textInput.value, { voice: false });
+        }
 
-                // 3. Remote audio → play it
-                pc.ontrack = (e) => {
-                    log(`▶ Remote audio track received: kind=${e.track.kind}`, 'audio');
-                    aiAudio.srcObject = e.streams[0];
+        async function transcribeAudioBlob(audioBlob) {
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "voice-message.webm");
+            const response = await fetch("/chatbot/transcribe", { method: "POST", body: formData });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.detail || `Transcription failed (${response.status})`);
+            return String(payload.transcript || "").trim();
+        }
+
+        async function toggleRecordedVoiceCapture() {
+            if (!voiceRecordBtn || assessmentComplete || voiceSessionActive) return;
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                return;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === "undefined") {
+                setStatus("Recorded voice capture is not supported in this browser.");
+                return;
+            }
+            try {
+                recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(recordingStream);
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) recordedChunks.push(event.data);
                 };
-
-                // 4. Mic input → add track
-                log('Requesting microphone…', 'info');
-                const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                log(`🎤 Microphone granted — tracks: ${micStream.getTracks().map(t => t.label).join(', ')}`, 'audio');
-                pc.addTrack(micStream.getTracks()[0]);
-
-                // 5. Data channel for events
-                log('Creating data channel…', 'info');
-                dc = pc.createDataChannel('oai-events');
-                dc.onopen = onDataChannelOpen;
-                dc.onmessage = onDataChannelMessage;
-                dc.onclose = () => log('DataChannel closed', 'warning');
-                dc.onerror = (e) => log(`DataChannel error: ${e}`, 'error');
-
-                // 6. Create SDP offer
-                log('Creating SDP offer…', 'info');
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                log(`SDP offer created (${offer.sdp.length} chars)`, 'info');
-
-                // 7. Exchange SDP with OpenAI
-                log('→ POST SDP to OpenAI Realtime…', 'send');
-                const sdpResp = await fetch(
-                    'https://api.openai.com/v1/realtime?model=gpt-realtime-2025-08-28',
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${ephemeralKey}`,
-                            'Content-Type': 'application/sdp',
-                        },
-                        body: offer.sdp,
-                    }
-                );
-                log(`← SDP response: ${sdpResp.status} ${sdpResp.statusText}`, sdpResp.ok ? 'info' : 'error');
-                if (!sdpResp.ok) throw new Error(`WebRTC handshake failed: ${sdpResp.status}`);
-
-                const answerSdp = await sdpResp.text();
-                log(`SDP answer received (${answerSdp.length} chars) — setting remote description`, 'info');
-                await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-                log('✅ WebRTC connected', 'info');
-
-                sessionActive = true;
-                orbSection.style.display = 'flex';
-                endBtn.style.display = 'block';
-                setOrb('waiting');
-
-            } catch (err) {
-                log(`❌ Session error: ${err.message}`, 'error');
-                console.error('Session error:', err);
-                setStatus('', `⚠️ ${err.message}`);
-                startBtn.disabled = false;
-            }
-        }
-
-        // ── Data channel events ────────────────────────────────────────────────────
-        function onDataChannelOpen() {
-            log('✅ DataChannel open — sending response.create for greeting', 'info');
-            // Just ask GPT to generate the opening greeting from the system prompt.
-            // No fake user turn — that collides with live VAD mic audio.
-            sendEvent({ type: 'response.create' });
-        }
-
-        function onDataChannelMessage(e) {
-            let event;
-            try { event = JSON.parse(e.data); }
-            catch { log(`Unparseable message: ${e.data}`, 'error'); return; }
-
-            // Log everything — suppress noisy delta events to keep log readable
-            if (event.type === 'response.audio_transcript.delta') {
-                // skip — too frequent
-            } else if (event.type === 'response.audio.delta') {
-                // skip audio byte deltas
-            } else {
-                const payload = JSON.stringify(event).slice(0, 300);
-                const cat = event.type.startsWith('error') ? 'error'
-                    : event.type.includes('audio') ? 'audio'
-                        : event.type.includes('speech') ? 'audio'
-                            : 'event';
-                log(`← ${event.type}  ${payload}`, cat);
-            }
-
-            switch (event.type) {
-
-                // ── Session ready ──
-                case 'session.created':
-                case 'session.updated':
-                    setOrb('waiting');
-                    break;
-
-                // ── User speech activity ──
-                case 'input_audio_buffer.speech_started':
-                    setOrb('listening');
-                    break;
-
-                case 'input_audio_buffer.speech_stopped':
-                    setOrb('waiting');
-                    setStatus('thinking', 'Processing…');
-                    break;
-
-                // ── User transcript (after VAD detects end of speech) ──
-                case 'conversation.item.input_audio_transcription.completed':
-                    addBubble('user', event.transcript || '');
-                    break;
-
-                // ── AI response: audio starts ──
-                case 'response.audio.delta':
-                    setOrb('speaking');
-                    break;
-
-                // ── AI transcript streaming ──
-                case 'response.audio_transcript.delta':
-                    currentAiText += event.delta || '';
-                    break;
-
-                // ── AI transcript complete — show in chat ──
-                case 'response.audio_transcript.done':
-                    if (currentAiText.trim()) addBubble('ai', currentAiText.trim());
-                    currentAiText = '';
-                    break;
-
-                // ── AI finished speaking ──
-                case 'response.audio.done':
-                    setOrb('waiting');
-                    break;
-
-                // ── Function call (complete_triage) ──
-                case 'response.done':
-                    handleResponseDone(event.response);
-                    break;
-
-                // ── Errors ──
-                case 'error':
-                    console.error('Realtime API error:', event.error);
-                    setStatus('', `⚠️ Error: ${event.error?.message || 'Unknown error'}`);
-                    break;
-            }
-        }
-
-        async function handleResponseDone(response) {
-            if (!response?.output) return;
-            for (const item of response.output) {
-                if (item.type === 'function_call' && item.name === 'complete_triage') {
+                mediaRecorder.onstop = async () => {
+                    if (recordingStream) recordingStream.getTracks().forEach((track) => track.stop());
+                    recordingStream = null;
+                    setVoiceButtons();
+                    if (!recordedChunks.length || assessmentComplete) return;
                     try {
-                        const clinicalData = JSON.parse(item.arguments);
-                        // Send result to our backend scorer
-                        const scoreResp = await fetch('/chatbot/score', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ clinical_data: clinicalData }),
-                        });
-                        if (!scoreResp.ok) throw new Error('Scoring failed');
-                        const result = await scoreResp.json();
-                        showResult(result);
-
-                        // Acknowledge function call so the session knows it was handled
-                        sendEvent({
-                            type: 'conversation.item.create',
-                            item: {
-                                type: 'function_call_output',
-                                call_id: item.call_id,
-                                output: JSON.stringify({ status: 'done', ctas_level: result.ctas_level }),
-                            },
-                        });
-                    } catch (err) {
-                        console.error('complete_triage handling error:', err);
-                        addBubble('ai', '⚠️ Could not calculate urgency level. Please try again.');
+                        setStatus("Uploading voice message for transcription and triage...");
+                        const audioBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+                        const transcript = await transcribeAudioBlob(audioBlob);
+                        if (!transcript) {
+                            setStatus("No speech was detected in the recording.");
+                            return;
+                        }
+                        setVoiceState(`Recorded voice transcript: ${transcript}`);
+                        setStatus("Transcript received. Sending to triage agent...");
+                        await sendStructuredMessage(transcript, { voice: true, autoSpeak: true });
+                    } catch (error) {
+                        setStatus(`Voice capture error: ${error.message}`);
+                    } finally {
+                        recordedChunks = [];
                     }
-                }
+                };
+                mediaRecorder.start();
+                setStatus("Recording voice message. Click the button again to stop and send.");
+                setVoiceState("Recording one symptom-only voice message for transcription...");
+                setVoiceButtons();
+            } catch (error) {
+                setStatus(`Microphone error: ${error.message}`);
+                setVoiceButtons();
             }
         }
 
-        function sendEvent(obj) {
-            if (dc && dc.readyState === 'open') {
-                log(`→ send: ${obj.type}`, 'send');
-                dc.send(JSON.stringify(obj));
-            } else {
-                log(`⚠ sendEvent called but dc not open (state: ${dc?.readyState})`, 'warning');
+        async function completeRealtimeTriage(argumentsText) {
+            let clinicalData;
+            try {
+                clinicalData = JSON.parse(argumentsText || "{}");
+            } catch (error) {
+                setStatus("Realtime tool output could not be parsed into clinical data.");
+                return;
+            }
+            try {
+                const response = await fetch("/chatbot/score", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ clinical_data: clinicalData, scenario: "normal" }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || `Realtime scoring failed (${response.status})`);
+                showResult(payload);
+            } catch (error) {
+                setStatus(`Realtime scoring error: ${error.message}`);
             }
         }
 
-        // ── Session control ────────────────────────────────────────────────────────
-        function endSession() {
-            sessionActive = false;
-            if (pc) { pc.close(); pc = null; }
-            dc = null;
-            endBtn.style.display = 'none';
-            orbSection.style.display = 'none';
-            startBtn.disabled = true;
-            setStatus('', 'Session ended.');
+        async function handleRealtimeEvent(raw) {
+            let event;
+            try {
+                event = JSON.parse(raw);
+            } catch (error) {
+                return;
+            }
+            if (event.type === "conversation.item.input_audio_transcription.completed" && event.transcript) {
+                chatHistory.push({ role: "user", content: event.transcript });
+                renderHistory(chatHistory);
+                return;
+            }
+            if ((event.type === "response.audio_transcript.done" || event.type === "response.text.done") && (event.transcript || event.text)) {
+                chatHistory.push({ role: "assistant", content: event.transcript || event.text });
+                renderHistory(chatHistory);
+                return;
+            }
+            if (event.type === "response.function_call_arguments.done" && event.name === "complete_triage") {
+                await completeRealtimeTriage(event.arguments || "{}");
+            }
         }
 
-        function resetAll() {
-            endSession();
-            chatLog.innerHTML = '';
-            resultCard.style.display = 'none';
-            resetBtn.style.display = 'none';
-            startBtn.disabled = false;
-            currentAiText = '';
-            setStatus('', 'Press Start to begin your voice assessment.');
+        async function startLiveVoice() {
+            if (!voiceBtn || assessmentComplete || voiceSessionActive) return;
+            if (!window.RTCPeerConnection || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setStatus("Live voice requires browser WebRTC and microphone support.");
+                return;
+            }
+            setStatus("Starting live voice session...");
+            setVoiceState("Requesting realtime voice session from the backend...");
+            voiceBtn.disabled = true;
+            try {
+                const response = await fetch("/chatbot/realtime-session", { method: "POST" });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || `Realtime session failed (${response.status})`);
+                const clientSecret = payload?.value || payload?.client_secret?.value || payload?.client_secret || payload?.secret || "";
+                if (!clientSecret) throw new Error("Realtime session did not return a client secret.");
+
+                voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                voicePeerConnection = new RTCPeerConnection();
+                remoteAudioElement = new Audio();
+                remoteAudioElement.autoplay = true;
+                voicePeerConnection.ontrack = (event) => { remoteAudioElement.srcObject = event.streams[0]; };
+                voiceStream.getTracks().forEach((track) => voicePeerConnection.addTrack(track, voiceStream));
+
+                voiceDataChannel = voicePeerConnection.createDataChannel("oai-events");
+                voiceDataChannel.addEventListener("message", (event) => {
+                    handleRealtimeEvent(event.data).catch((error) => setStatus(`Realtime event error: ${error.message}`));
+                });
+                voiceDataChannel.addEventListener("open", () => {
+                    setVoiceState("Live voice connected. Speak your symptoms now.");
+                });
+
+                const offer = await voicePeerConnection.createOffer();
+                await voicePeerConnection.setLocalDescription(offer);
+                const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${clientSecret}`, "Content-Type": "application/sdp" },
+                    body: offer.sdp,
+                });
+                const answerSdp = await sdpResponse.text();
+                if (!sdpResponse.ok) throw new Error(answerSdp || `Realtime WebRTC connection failed (${sdpResponse.status})`);
+                await voicePeerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
+                voiceSessionActive = true;
+                setStatus("Live voice session ready. Speak directly to the assistant.");
+            } catch (error) {
+                setStatus(`Live voice unavailable: ${error.message}`);
+                setVoiceState("Recorded voice remains available and uses the same triage pipeline.");
+                stopVoiceSession(true);
+            } finally {
+                setVoiceButtons();
+            }
         }
 
-        // ── Button listeners ───────────────────────────────────────────────────────
-        startBtn.addEventListener('click', startSession);
-        endBtn.addEventListener('click', () => { endSession(); resetBtn.style.display = 'block'; });
-        resetBtn.addEventListener('click', resetAll);
+        function stopVoiceSession(quiet = false) {
+            if (voiceDataChannel) { try { voiceDataChannel.close(); } catch (error) {} voiceDataChannel = null; }
+            if (voicePeerConnection) { try { voicePeerConnection.close(); } catch (error) {} voicePeerConnection = null; }
+            if (voiceStream) { voiceStream.getTracks().forEach((track) => track.stop()); voiceStream = null; }
+            if (remoteAudioElement) { remoteAudioElement.pause(); remoteAudioElement.srcObject = null; remoteAudioElement = null; }
+            voiceSessionActive = false;
+            setVoiceButtons();
+            if (!quiet && !assessmentComplete) {
+                setStatus("Live voice session ended. You can continue in text mode or record one voice message.");
+                setVoiceState("Live voice stopped. Recorded voice remains available.");
+            }
+        }
+
+        function resetAssessment() {
+            chatHistory = [];
+            assessmentComplete = false;
+            sending = false;
+            textInput.value = "";
+            resultCard.style.display = "none";
+            stopVoiceSession(true);
+            if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+            mediaRecorder = null;
+            recordedChunks = [];
+            setComposerState(false);
+            setVoiceButtons();
+            setStatus("Type a short symptom summary below to begin.");
+            setVoiceState("Live voice will be attempted first. If unavailable, recorded voice falls back to Whisper transcription and the same triage agent scoring flow.");
+            renderIntro();
+            textInput.focus();
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        textInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+        resetBtn.addEventListener("click", resetAssessment);
+        if (voiceBtn) voiceBtn.addEventListener("click", startLiveVoice);
+        if (voiceStopBtn) voiceStopBtn.addEventListener("click", () => stopVoiceSession(false));
+        if (voiceRecordBtn) voiceRecordBtn.addEventListener("click", toggleRecordedVoiceCapture);
+
+        if (dashboardLink) {
+            dashboardLink.setAttribute("href", resolveDashboardUrl());
+        }
+
+        renderIntro();
+        setVoiceButtons();
+        textInput.focus();
     </script>
 </body>
 

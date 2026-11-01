@@ -6,4 +6,10 @@ sqlalchemy
 pymysql
 pydantic
 openai
+httpx
 python-multipart
+scikit-learn
+joblib
+python-dotenv
+
+
