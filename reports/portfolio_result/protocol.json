@@ -1,0 +1,131 @@
+{
+  "warmup_days": 7,
+  "measurement_days": 21,
+  "guard_days": 7,
+  "start": "2026-01-05 00:00:00",
+  "measurement_start": "2026-01-12 00:00:00",
+  "measurement_end": "2026-02-02 00:00:00",
+  "seeds": [
+    910000,
+    910001,
+    910002,
+    910003,
+    910004,
+    910005,
+    910006,
+    910007,
+    910008,
+    910009
+  ],
+  "methods": [
+    "FCFS",
+    "CTAS",
+    "Predictive"
+  ],
+  "reservation_threshold": 0.8,
+  "reservation_minutes": 30,
+  "assessment_minutes": 15,
+  "ctas_mix": {
+    "1": 0.05263157894736842,
+    "2": 0.21052631578947367,
+    "3": 0.3157894736842105,
+    "4": 0.2631578947368421,
+    "5": 0.15789473684210525
+  },
+  "clamped_service_means": {
+    "1": 191.58799396268773,
+    "2": 248.31829244457003,
+    "3": 294.08443019916837,
+    "4": 92.62599177388029,
+    "5": 48.45896203609227
+  },
+  "bed_minutes_per_arrival": {
+    "ED": 172.35642203542278,
+    "ICU": 14.900135328453864
+  },
+  "scenarios": [
+    {
+      "scenario": "Normal",
+      "target_ed_load": 0.775,
+      "expected_patients_day": 323.74772776689434,
+      "icu_offered_load": 0.16749600541688078,
+      "configuration": {
+        "name": "Normal",
+        "description": "Balanced arrivals with comfortable ED and ICU capacity.",
+        "ed_beds": 50,
+        "icu_beds": 20,
+        "physicians": 8,
+        "nurses": 22,
+        "lab_slots_per_hour": 22,
+        "imaging_slots_per_hour": 14,
+        "arrival_rates_per_hour": {
+          "1": 0.7049378170860585,
+          "2": 2.819751268344234,
+          "3": 4.229626902516351,
+          "4": 3.5246890854302926,
+          "5": 2.1148134512581755
+        },
+        "senior_staff_available": true,
+        "ed_near_full_threshold": 0.85,
+        "peak_hour_multiplier": 1.2,
+        "ed_util_alert": 0.9,
+        "icu_util_alert": 0.9
+      },
+      "physician_offered_load": 0.42154652052981034,
+      "nurse_offered_load": 0.06642551232590951,
+      "lab_offered_load": 0.19040187338762724,
+      "imaging_offered_load": 0.17292915909854475
+    },
+    {
+      "scenario": "Moderate Congestion",
+      "target_ed_load": 0.925,
+      "expected_patients_day": 386.40857830242226,
+      "icu_offered_load": 0.19991458711047058,
+      "configuration": {
+        "name": "Moderate Congestion",
+        "description": "Balanced arrivals with comfortable ED and ICU capacity.",
+        "ed_beds": 50,
+        "icu_beds": 20,
+        "physicians": 8,
+        "nurses": 22,
+        "lab_slots_per_hour": 22,
+        "imaging_slots_per_hour": 14,
+        "arrival_rates_per_hour": {
+          "1": 0.8413773945865858,
+          "2": 3.365509578346343,
+          "3": 5.048264367519515,
+          "4": 4.206886972932929,
+          "5": 2.5241321837597575
+        },
+        "senior_staff_available": true,
+        "ed_near_full_threshold": 0.85,
+        "peak_hour_multiplier": 1.2,
+        "ed_util_alert": 0.9,
+        "icu_util_alert": 0.9
+      },
+      "physician_offered_load": 0.5031361696646124,
+      "nurse_offered_load": 0.07928206309866617,
+      "lab_offered_load": 0.2272538488820067,
+      "imaging_offered_load": 0.2063993189240695
+    }
+  ],
+  "model_path": "reports\\simulation_validation\\development\\predictor.pkl",
+  "model_sha256": "d77e98cd3c028771c4d4f4a86fabb253c9ccc331e773cb47d938989f68e7b441",
+  "python": "3.13.7",
+  "packages": {
+    "numpy": "2.3.3",
+    "pandas": "2.3.2",
+    "scipy": "1.16.2",
+    "scikit-learn": "1.7.2",
+    "matplotlib": "3.10.6",
+    "joblib": "1.5.2"
+  },
+  "source_sha256": {
+    "reports\\portfolio_result\\run_analysis.py": "516cad4ddcaddc478e5167a48ccebeff4e3e49f289a684373d1a8fd1e8a31216",
+    "backend\\data\\synthetic_generator.py": "e4d1c6aa553e9363e1cee574bc9f5e61f5d417ee6e43122f4526c350e3023c1c",
+    "backend\\simulation\\queue_engine.py": "5c1df97c33d0815902b1f4eda73cc237ef619b6444b3e15d437abc578821024f",
+    "backend\\simulation\\metrics.py": "b2693ea6815b9a3da1f90bb55f71f2a807b4fa75e37a21ecce50a4e5268b5e56",
+    "backend\\ml\\predictor.py": "f01cbee18fa1be9825fc3323fe0ace68a12b32a59bf6e18554e91b1c212f05e5",
+    "backend\\optimization\\congestion_scenarios.py": "0c6b7019b2351ea7abb01911162756ee996b02fd2e7acc33ab065d0e974a2045"
+  }
+}

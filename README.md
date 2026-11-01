@@ -32,15 +32,15 @@ The application consists of a **Python/FastAPI backend** and a **React frontend*
 
 ---
 
-### Key Experimental Result: 93.6% Reduction in Urgent Patient Waiting Time
+### Key Finding: Prioritizing High-Acuity Patients
 
-Across **60 synthetic simulation runs** comparing FCFS, CTAS Priority, and Predictive Scheduling, CTAS-based priority scheduling reduced mean waiting time for high-acuity patients (CTAS 1–2) from **185.6 to 11.8 minutes** under moderate congestion: a **93.6% reduction compared with FCFS**.
+We compared FCFS, CTAS Priority, and Predictive Scheduling across two scenarios and 10 random seeds, for **60 synthetic simulation runs**. In the **Moderate Congestion** scenario, CTAS Priority reduced mean waiting time for high-acuity patients (CTAS 1–2) from **185.6 to 11.8 minutes** compared with FCFS—a **93.6% reduction**.
 
-> **Trade-off:** Overall mean waiting increased by **281.8 minutes** compared with FCFS. This is a prioritization trade-off, not an overall ED performance improvement. Results are from synthetic simulations, not real hospital deployment.
+![Mean waiting time for CTAS 1–2 patients under Moderate Congestion: FCFS 185.6 minutes versus CTAS Priority 11.8 minutes, with 95% confidence intervals](reports/portfolio_result/urgent_wait_reduction.png)
 
-![Synthetic ED scheduling comparison showing urgent and overall waiting-time trade-offs](reports/portfolio_result/comparison.png)
+> **The trade-off:** Overall mean waiting increased by **281.8 minutes** compared with FCFS. Prioritizing high-acuity patients did not improve overall ED waiting time. These synthetic results do not demonstrate real-world clinical improvement.
 
-See the [verified analysis](reports/portfolio_result/analysis.md) for methodology, uncertainty, and limitations.
+See the [detailed analysis](reports/portfolio_result/analysis.md) for methods, uncertainty, and limitations.
 
 ## Design Principles
 
