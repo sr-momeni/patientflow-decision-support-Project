@@ -5,8 +5,13 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 import joblib
 from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.model_selection import train_test_split
+import sklearn
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+FEATURE_NAMES = ('hour_sin', 'hour_cos', 'dow_sin', 'dow_cos', 'ed_occupancy',
+                 'icu_occupancy', 'arrivals_15m', 'arrivals_30m', 'arrivals_1h',
+                 'arrivals_4h', 'active_ctas1', 'active_ctas2', 'active_ctas3')
+FEATURE_SCHEMA = 'causal-state-v2-13'
 
 class HighUrgencyPredictor:
     """Predicts expected count of high-urgency (L1/L2) patients arriving in next time window."""
@@ -23,10 +28,10 @@ class HighUrgencyPredictor:
         self.prediction_window_minutes = prediction_window_minutes
         self.is_trained = False
         
-    def _extract_features(self, timestamp: datetime, ed_occupancy: float, 
-                         icu_occupancy: float, rates: Dict[str, float],
-                         acuity_counts: Dict[int, int]) -> np.ndarray:
-        """Extract features including cyclical time encoding."""
+    def _extract_features(self, timestamp: datetime, ed_occupancy: float = 0.0, 
+                         icu_occupancy: float = 0.0, rates: Dict[str, float] = None,
+                         acuity_counts: Dict[int, int] = None) -> np.ndarray:
+        """Extract features using cyclical time encoding."""
         
         # Cyclical encoding helps the model understand that 23:00 is close to 01:00
         hour_sin = np.sin(2 * np.pi * timestamp.hour / 24.0)
@@ -36,49 +41,31 @@ class HighUrgencyPredictor:
         
         features = [
             hour_sin, hour_cos,
-            dow_sin, dow_cos,
-            ed_occupancy,
-            icu_occupancy,
-            rates.get('15m', 0.0),
-            rates.get('30m', 0.0),
-            rates.get('1h', 0.0),
-            rates.get('4h', 0.0),
-            acuity_counts.get(1, 0),
-            acuity_counts.get(2, 0),
-            acuity_counts.get(3, 0),
+            dow_sin, dow_cos, ed_occupancy, icu_occupancy,
+            *[(rates or {}).get(k, 0) for k in ('15m', '30m', '1h', '4h')],
+            *[(acuity_counts or {}).get(k, 0) for k in (1, 2, 3)]
         ]
         return np.array(features).reshape(1, -1)
     
-    def train(self, features_matrix: np.ndarray, labels: np.ndarray) -> Dict:
+    def train(self, features_matrix: np.ndarray, labels: np.ndarray,
+              validation=None) -> Dict:
+        """Fit supplied training-only rows; no leaky random row split.
+
+        Caller must supply independent stream/day blocks for validation. No
+        held-out accuracy is implied when validation is omitted.
         """
-        Train the regressor model.
-        features_matrix: Pre-calculated features from historical data.
-        labels: Actual count of L1/L2 arrivals in the target window.
-        """
-        # Train/test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            features_matrix, labels, test_size=0.2, random_state=42
-        )
-        
-        # Train
-        self.model.fit(X_train, y_train)
+        if features_matrix.ndim != 2 or features_matrix.shape[1] != len(FEATURE_NAMES):
+            raise ValueError('Expected the shared 13-feature causal schema')
+        self.model.fit(features_matrix, labels)
         self.is_trained = True
-        
-        # Evaluate
-        y_pred = self.model.predict(X_test)
-        
-        mse = mean_squared_error(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        
-        return {
-            'mse': mse,
-            'mae': mae,
-            'r2': r2,
-            'train_size': len(X_train),
-            'test_size': len(X_test),
-        }
-    
+        result = {'train_size': len(labels), 'test_size': 0}
+        if validation is not None:
+            X, y = validation
+            pred = self.model.predict(X)
+            result.update(mse=mean_squared_error(y, pred), mae=mean_absolute_error(y, pred),
+                          r2=r2_score(y, pred), test_size=len(y))
+        return result
+
     def predict(self, timestamp: datetime, ed_occupancy: float, 
                 icu_occupancy: float, rates: Dict[str, float],
                 acuity_counts: Dict[int, int]) -> float:
@@ -89,7 +76,7 @@ class HighUrgencyPredictor:
             float: Expected number of L1/L2 patients.
         """
         if not self.is_trained:
-            raise ValueError("Model must be trained before prediction")
+            return 0.0
             
         features = self._extract_features(timestamp, ed_occupancy, icu_occupancy, rates, acuity_counts)
         expected_count = self.model.predict(features)[0]
@@ -100,6 +87,9 @@ class HighUrgencyPredictor:
     def save(self, path: str):
         """Save trained model to disk."""
         joblib.dump({
+            'feature_schema': FEATURE_SCHEMA,
+            'feature_names': FEATURE_NAMES,
+            'sklearn_version': sklearn.__version__,
             'model': self.model,
             'prediction_window': self.prediction_window_minutes,
             'is_trained': self.is_trained
@@ -109,6 +99,12 @@ class HighUrgencyPredictor:
     def load(cls, path: str):
         """Load trained model from disk."""
         data = joblib.load(path)
+        if data.get('feature_schema') != FEATURE_SCHEMA or tuple(data.get('feature_names', ())) != FEATURE_NAMES:
+            raise ValueError('Legacy/incompatible feature schema: retrain with the v2 evaluation workflow; original file is preserved')
+        if data.get('sklearn_version') != sklearn.__version__:
+            raise ValueError('Model sklearn version differs; reproduce in the recorded environment or retrain')
+        if data['model'].n_features_in_ != len(FEATURE_NAMES):
+            raise ValueError('Model feature count does not match its metadata')
         predictor = cls(prediction_window_minutes=data['prediction_window'])
         predictor.model = data['model']
         predictor.is_trained = data['is_trained']

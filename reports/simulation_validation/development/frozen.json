@@ -1,0 +1,24 @@
+{
+  "source_hashes": {
+    "backend\\simulation\\apply_fcfs_waits.py": "6308f7ba9ce28754fadcdd983f4122d08caf9825a697bf6e1d80af31d84501c9",
+    "backend\\simulation\\engine.py": "b436f5387336b27f1be49c0e70d81d1250a776017749a3255d025bfc45ba073e",
+    "backend\\simulation\\event_model.py": "389210e0229f7d1f5be314bd1e0fbe980178cc8a98da66f689de8cf8d547b338",
+    "backend\\simulation\\metrics.py": "a6ca70c51b36371487d69b14fd6306a979c881b271e8d83f51bcc8bcfea998ea",
+    "backend\\simulation\\predictive_engine.py": "fb6f91f6e0034f536239a34fcf2a5528040b914ef7fa755847bc3324600c94ae",
+    "backend\\simulation\\queue_engine.py": "5c1df97c33d0815902b1f4eda73cc237ef619b6444b3e15d437abc578821024f",
+    "backend\\simulation\\realtime_manager.py": "2670458dff9cfad0524444eec61b5e929a09bd90dec8fbfee8229bff919e4284",
+    "backend\\simulation\\run_fcfs.py": "dbc935e939012efe0e68a6432f220d3ede1ce72d513323ffd8fdf1ef20fed373",
+    "backend\\simulation\\run_predictive.py": "31d13bfd813d42889e339ad7c17d16e6f001be9937d194d2317ba713df5276fd",
+    "backend\\ml\\__init__.py": "6b3d0f5c65ee7f008ace8617aa1c98ed153861c3324e00d52c75b755a99f3bc2",
+    "backend\\ml\\predictor.py": "99e5a1808f7c9bc9ba0baddd77c214f1af021a2d86df0a4ada76c3b018d36f69",
+    "backend\\ml\\train_model.py": "b1158db6b837b737af62155a2c9e79559b744ee5c55abdc50304588ad8ecc278",
+    "backend\\data\\synthetic_generator.py": "fde237479b3c86b458ad4666aba14c0cb804d3a9a41628936c4f400784874bd4",
+    "backend\\optimization\\congestion_scenarios.py": "fbb9c679f2c19958d4817c178e1d09a98f311003049cde53dc7100d36f76027d",
+    "backend\\optimization\\validate_simulation.py": "b90a2586d8c998696166a8155e003e65253df3c2ce328486b68af5a4ec87dd7b"
+  },
+  "protocol_sha256": "d85b0452eb8e9bc97b7107c8e44b0ae58498383e853112d8164de144f1c51d79",
+  "model_sha256": "d77e98cd3c028771c4d4f4a86fabb253c9ccc331e773cb47d938989f68e7b441",
+  "validation_runs": 75,
+  "training_runs": 25,
+  "parameters_tuned": false
+}

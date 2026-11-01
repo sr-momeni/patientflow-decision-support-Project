@@ -169,6 +169,8 @@ def validate_scenario(cfg: ScenarioConfig) -> None:
         raise ValueError("physicians and nurses must be > 0")
     if cfg.lab_slots_per_hour <= 0 or cfg.imaging_slots_per_hour <= 0:
         raise ValueError("lab_slots_per_hour and imaging_slots_per_hour must be > 0")
+    if cfg.peak_hour_multiplier <= 0:
+        raise ValueError("peak_hour_multiplier must be positive")
 
     for lvl in (1, 2, 3, 4, 5):
         rate = cfg.arrival_rates_per_hour.get(lvl, 0.0)

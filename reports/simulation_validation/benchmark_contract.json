@@ -1,0 +1,33 @@
+{
+  "status": "not_calibrated_not_externally_validated",
+  "official_statistics_used": false,
+  "definition_sources_reviewed": "2026-11-01",
+  "geography": null,
+  "facility_or_peer_group": null,
+  "fiscal_year": null,
+  "source_file_sha256": null,
+  "calibration_period": null,
+  "external_validation_period": null,
+  "benchmark_values": {},
+  "blocking_gaps": [
+    "admitted ED departure and boarding pathway absent",
+    "scope and case mix not selected",
+    "source-specific exclusions and percentile definition not implemented",
+    "configured demand and capacity not calibrated"
+  ],
+  "required_source_columns": [
+    "indicator",
+    "geography",
+    "period",
+    "population",
+    "ctas_group",
+    "disposition_group",
+    "statistic",
+    "value",
+    "unit",
+    "source_url",
+    "retrieved_at",
+    "file_sha256",
+    "coverage_notes"
+  ]
+}

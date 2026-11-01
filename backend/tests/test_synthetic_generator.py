@@ -20,17 +20,19 @@ def test_generator_outputs_required_columns():
         assert col in first_row
 
 
-def test_icu_bottleneck_increases_los():
-    normal = get_scenario("normal")
-    bottleneck = get_scenario("icu_bottleneck")
+def test_icu_bottleneck_increases_simulated_wait_not_service_requirement():
+    # Bed capacity belongs to the queue engine, not generated service duration.
+    from datetime import datetime
+    from backend.simulation.event_model import SimulationPatient
+    from backend.simulation.engine import SimulationEngine
+    def patients():
+        return [SimulationPatient(str(i), datetime(2026,1,5), 1, 60., 'ICU') for i in range(4)]
+    normal, bottleneck = patients(), patients()
+    SimulationEngine(1,4).run(normal)
+    SimulationEngine(1,1).run(bottleneck)
+    assert sum(p.wait_minutes for p in bottleneck) > sum(p.wait_minutes for p in normal)
+    assert [p.los_minutes for p in normal] == [p.los_minutes for p in bottleneck]
 
-    normal_events = generate_events(150, normal, seed=1)
-    bottleneck_events = generate_events(150, bottleneck, seed=1)
-
-    normal_avg_los = summarize(normal_events)["avg_los"]
-    bottleneck_avg_los = summarize(bottleneck_events)["avg_los"]
-
-    assert bottleneck_avg_los > normal_avg_los
 @pytest.mark.parametrize(
     "pid,expected",
     [

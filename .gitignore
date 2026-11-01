@@ -186,3 +186,14 @@ openAI_key.txt
 *.key
 .env
 secrets.json
+# Generated ED simulation data and local recovery copies
+reports/simulation_validation/final_test/raw/
+reports/simulation_validation/final_test/inputs/
+reports/simulation_validation/development/raw/
+reports/simulation_validation/development/inputs/
+reports/simulation_validation/source_snapshot/
+reports/simulation_validation/before/
+reports/resume_evaluation/artifacts/
+reports/simulation_validation/development/predictor.pkl
+reports/simulation_validation/development/training_features.csv.gz
+reports/git_recovery_local/

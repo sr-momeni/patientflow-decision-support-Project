@@ -14,6 +14,17 @@ class SimulationPatient:
     service_start: Optional[datetime] = None
     discharge: Optional[datetime] = None
     wait_minutes: float = 0.0
+    triage_minutes: float = 0.0
+    lab_required: bool = False
+    imaging_required: bool = False
+    disposition: str = "unknown"
+    triage_start: Optional[datetime] = None
+    triage_end: Optional[datetime] = None
+    physician_end: Optional[datetime] = None
+    lab_start: Optional[datetime] = None
+    lab_end: Optional[datetime] = None
+    imaging_start: Optional[datetime] = None
+    imaging_end: Optional[datetime] = None
 
 @dataclass
 class HospitalState:

@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "days": 5,
+  "start_date": "2026-01-05",
+  "train_seed_base": 100000,
+  "validation_seed_base": 200000,
+  "final_seed_base": 300000,
+  "scenario_seed_offset": 1000,
+  "train_seeds_per_scenario": 5,
+  "validation_seeds_per_scenario": 5,
+  "final_seeds_per_scenario": 30,
+  "methods": [
+    "FCFS",
+    "CTAS",
+    "Predictive"
+  ],
+  "threshold": 0.8,
+  "reservation_minutes": 30,
+  "forecast_interval_minutes": 15,
+  "forecast_window_minutes": 60,
+  "priority": "strict CTAS then arrival then stable input sequence; nonpreemptive",
+  "physician_initial_assessment_minutes": 15,
+  "nurse_role": "triage only, sampled 3-10 minutes",
+  "lab_imaging": "single throughput server per service; slot duration 60 / slots_per_hour; sequential after initial assessment",
+  "initial_state": "empty; finite 5-day arrival cohort, drain to completion; not steady-state",
+  "inference": "paired seed-level Student t 95% intervals; descriptive unadjusted multiple comparisons",
+  "calibration": "none; Ontario definitions consulted only; no official aggregate values used"
+}
