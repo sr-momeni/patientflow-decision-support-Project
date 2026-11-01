@@ -32,6 +32,16 @@ The application consists of a **Python/FastAPI backend** and a **React frontend*
 
 ---
 
+### Key Experimental Result: 93.6% Reduction in Urgent Patient Waiting Time
+
+Across **60 synthetic simulation runs** comparing FCFS, CTAS Priority, and Predictive Scheduling, CTAS-based priority scheduling reduced mean waiting time for high-acuity patients (CTAS 1–2) from **185.6 to 11.8 minutes** under moderate congestion: a **93.6% reduction compared with FCFS**.
+
+> **Trade-off:** Overall mean waiting increased by **281.8 minutes** compared with FCFS. This is a prioritization trade-off, not an overall ED performance improvement. Results are from synthetic simulations, not real hospital deployment.
+
+![Synthetic ED scheduling comparison showing urgent and overall waiting-time trade-offs](reports/portfolio_result/comparison.png)
+
+See the [verified analysis](reports/portfolio_result/analysis.md) for methodology, uncertainty, and limitations.
+
 ## Design Principles
 
 The current implementation follows several important separation-of-responsibility principles:
